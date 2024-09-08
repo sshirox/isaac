@@ -60,7 +60,7 @@ func main() {
 
 	m.Handle("POST /update/{metric_type}/{metric_name}/{metric_value}", metricsHandler())
 
-	err := http.ListenAndServe(":8081", m)
+	err := http.ListenAndServe(":8080", m)
 
 	if err != nil {
 		panic(err)
