@@ -1,8 +1,8 @@
 package storage
 
 const (
-	Gauge   = "gauge"
-	Counter = "counter"
+	GaugeMetricType   = "gauge"
+	CounterMetricType = "counter"
 )
 
 type MetricValue interface {
@@ -15,7 +15,7 @@ type MetricArg struct {
 	Value string
 }
 
-type Upserter interface {
+type Repository interface {
 	Upsert(MetricArg) error
 }
 
