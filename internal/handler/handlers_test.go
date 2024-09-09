@@ -1,13 +1,11 @@
 package handler
 
 import (
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestMetricsHandler(t *testing.T) {
@@ -61,14 +59,10 @@ func TestMetricsHandler(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, tc.request, nil)
 			w := httptest.NewRecorder()
-			// h := http.HandlerFunc(MetricsHandler)
-			// h(w, request)
+
 			mux.ServeHTTP(w, request)
 
 			result := w.Result()
-
-			_, err := io.ReadAll(result.Body)
-			require.NoError(t, err)
 
 			assert.Equal(t, tc.want.statusCode, result.StatusCode)
 			assert.Equal(t, tc.want.contentType, result.Header.Get("Content-Type"))
