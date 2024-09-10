@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"log/slog"
@@ -11,12 +12,16 @@ import (
 	"time"
 )
 
+var (
+	flagServerAddr     string
+	flagReportInterval int64
+	flagPollInterval   int64
+)
+
 const (
 	gaugeMetricType   = "gauge"
 	counterMetricType = "counter"
-	pollInterval      = 2
-	reportInterval    = 10
-	updateMetricsURL  = "http://localhost:8080/update"
+	updateMetricsURL  = "update"
 )
 
 type GaugeMonitor struct {
@@ -90,6 +95,43 @@ func pollMetrics(gm *GaugeMonitor, cm *CounterMonitor, memStats *runtime.MemStat
 	cm.PollCount += 1
 }
 
+func main() {
+	parseFlags()
+
+	run()
+}
+
+func parseFlags() {
+	flag.StringVar(&flagServerAddr, "a", "localhost:8080", "server address and port")
+	flag.Int64Var(&flagReportInterval, "r", 10, "report interval in seconds")
+	flag.Int64Var(&flagPollInterval, "p", 2, "poll interval in seconds")
+	flag.Parse()
+}
+
+func run() {
+	var gm GaugeMonitor
+	var cm CounterMonitor
+	var memStats runtime.MemStats
+
+	client := &http.Client{}
+
+	pollTicker := time.NewTicker(time.Duration(flagPollInterval) * time.Second)
+	reportTicker := time.NewTicker(time.Duration(flagReportInterval) * time.Second)
+
+	for {
+		select {
+		case pt := <-pollTicker.C:
+			msg := fmt.Sprintf("Poll metrics %v", pt)
+			slog.Info(msg)
+			pollMetrics(&gm, &cm, &memStats)
+		case rt := <-reportTicker.C:
+			msg := fmt.Sprintf("Send report %v", rt)
+			slog.Info(msg)
+			sendReport(client, gm, cm)
+		}
+	}
+}
+
 func sendReport(client *http.Client, gm GaugeMonitor, cm CounterMonitor) {
 	gmv := reflect.ValueOf(&gm).Elem()
 
@@ -105,7 +147,7 @@ func sendReport(client *http.Client, gm GaugeMonitor, cm CounterMonitor) {
 }
 
 func sendGaugeMetric(client *http.Client, name string, value string) {
-	url := fmt.Sprintf("%s/%s/%s/%s", updateMetricsURL, gaugeMetricType, name, value)
+	url := fmt.Sprintf("http://%s/%s/%s/%s/%s", flagServerAddr, updateMetricsURL, gaugeMetricType, name, value)
 
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
@@ -130,7 +172,7 @@ func sendGaugeMetric(client *http.Client, name string, value string) {
 }
 
 func sendCounterMetric(client *http.Client, cm CounterMonitor) {
-	url := fmt.Sprintf("%s/%s/PollCount/%d", updateMetricsURL, counterMetricType, cm.PollCount)
+	url := fmt.Sprintf("http://%s/%s/%s/PollCount/%d", flagServerAddr, updateMetricsURL, counterMetricType, cm.PollCount)
 
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
@@ -152,28 +194,4 @@ func sendCounterMetric(client *http.Client, cm CounterMonitor) {
 
 	msg := fmt.Sprintf("Sent counter metric %s", url)
 	slog.Info(msg)
-}
-
-func main() {
-	var gm GaugeMonitor
-	var cm CounterMonitor
-	var memStats runtime.MemStats
-
-	client := &http.Client{}
-
-	pollTicker := time.NewTicker(pollInterval * time.Second)
-	reportTicker := time.NewTicker(reportInterval * time.Second)
-
-	for {
-		select {
-		case pt := <-pollTicker.C:
-			msg := fmt.Sprintf("Poll metrics %v", pt)
-			slog.Info(msg)
-			pollMetrics(&gm, &cm, &memStats)
-		case rt := <-reportTicker.C:
-			msg := fmt.Sprintf("Send report %v", rt)
-			slog.Info(msg)
-			sendReport(client, gm, cm)
-		}
-	}
 }
