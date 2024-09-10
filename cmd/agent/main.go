@@ -7,8 +7,10 @@ import (
 	"log/slog"
 	"math/rand"
 	"net/http"
+	"os"
 	"reflect"
 	"runtime"
+	"strconv"
 	"time"
 )
 
@@ -16,6 +18,9 @@ var (
 	flagServerAddr     string
 	flagReportInterval int64
 	flagPollInterval   int64
+	serverAddr         string
+	reportInterval     int64
+	pollInterval       int64
 )
 
 const (
@@ -115,8 +120,10 @@ func run() {
 
 	client := &http.Client{}
 
-	pollTicker := time.NewTicker(time.Duration(flagPollInterval) * time.Second)
-	reportTicker := time.NewTicker(time.Duration(flagReportInterval) * time.Second)
+	initConf()
+
+	pollTicker := time.NewTicker(time.Duration(pollInterval) * time.Second)
+	reportTicker := time.NewTicker(time.Duration(reportInterval) * time.Second)
 
 	for {
 		select {
@@ -129,6 +136,32 @@ func run() {
 			slog.Info(msg)
 			sendReport(client, gm, cm)
 		}
+	}
+}
+
+func initConf() {
+	addrFromEnv := os.Getenv("ADDRESS")
+	reportIntervalFromEnv := os.Getenv("REPORT_INTERVAL")
+	pollIntervalFromEnv := os.Getenv("POLL_INTERVAL")
+
+	if addrFromEnv != "" {
+		serverAddr = addrFromEnv
+	} else {
+		serverAddr = flagServerAddr
+	}
+
+	if reportIntervalFromEnv != "" {
+		i, _ := strconv.Atoi(reportIntervalFromEnv)
+		reportInterval = int64(i)
+	} else {
+		reportInterval = flagReportInterval
+	}
+
+	if pollIntervalFromEnv != "" {
+		i, _ := strconv.Atoi(pollIntervalFromEnv)
+		pollInterval = int64(i)
+	} else {
+		pollInterval = flagPollInterval
 	}
 }
 
@@ -147,7 +180,7 @@ func sendReport(client *http.Client, gm GaugeMonitor, cm CounterMonitor) {
 }
 
 func sendGaugeMetric(client *http.Client, name string, value string) {
-	url := fmt.Sprintf("http://%s/%s/%s/%s/%s", flagServerAddr, updateMetricsURL, gaugeMetricType, name, value)
+	url := fmt.Sprintf("http://%s/%s/%s/%s/%s", serverAddr, updateMetricsURL, gaugeMetricType, name, value)
 
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
@@ -172,7 +205,7 @@ func sendGaugeMetric(client *http.Client, name string, value string) {
 }
 
 func sendCounterMetric(client *http.Client, cm CounterMonitor) {
-	url := fmt.Sprintf("http://%s/%s/%s/PollCount/%d", flagServerAddr, updateMetricsURL, counterMetricType, cm.PollCount)
+	url := fmt.Sprintf("http://%s/%s/%s/PollCount/%d", serverAddr, updateMetricsURL, counterMetricType, cm.PollCount)
 
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {

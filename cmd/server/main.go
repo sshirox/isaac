@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sshirox/isaac/internal/handler"
@@ -10,6 +11,7 @@ import (
 )
 
 var flagRunAddr string
+var runAddr string
 
 func main() {
 	parseFlags()
@@ -30,6 +32,14 @@ func run() error {
 	counterStore := make(map[string]string)
 	ms, err := storage.NewMemStorage(gaugeStore, counterStore)
 
+	addrFromEnv := os.Getenv("ADDRESS")
+
+	if addrFromEnv != "" {
+		runAddr = addrFromEnv
+	} else {
+		runAddr = flagRunAddr
+	}
+
 	if err != nil {
 		return err
 	}
@@ -38,7 +48,7 @@ func run() error {
 	r.Get("/value/{metric_type}/{metric_name}", handler.GetMetricHandler(ms))
 	r.Get("/", handler.IndexHandler(ms))
 
-	err = http.ListenAndServe(flagRunAddr, r)
+	err = http.ListenAndServe(runAddr, r)
 
 	if err != nil {
 		return err
