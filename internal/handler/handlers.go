@@ -1,13 +1,13 @@
 package handler
 
 import (
+	"github.com/sshirox/isaac/internal/usecase"
 	"html/template"
 	"net/http"
 	"slices"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/sshirox/isaac/internal/storage"
 )
 
 const (
@@ -19,7 +19,7 @@ var (
 	metricTypes = []string{GaugeMetricType, CounterMetricType}
 )
 
-func UpdateMetricsHandler(repo storage.Repository) http.HandlerFunc {
+func UpdateMetricsHandler(uc *usecase.UseCase) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		metricType := chi.URLParam(r, "metric_type")
 		metricName := chi.URLParam(r, "metric_name")
@@ -54,21 +54,21 @@ func UpdateMetricsHandler(repo storage.Repository) http.HandlerFunc {
 			}
 		}
 
-		_ = repo.Upsert(metricType, metricName, metricValue)
+		_ = uc.UpsertMetric(metricType, metricName, metricValue)
 
 		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte(`""`))
 	}
 }
 
-func GetMetricHandler(repo storage.Repository) http.HandlerFunc {
+func GetMetricHandler(uc *usecase.UseCase) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		metricType := chi.URLParam(r, "metric_type")
 		metricName := chi.URLParam(r, "metric_name")
 
 		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
-		val, err := repo.Get(metricType, metricName)
+		val, err := uc.GetMetric(metricType, metricName)
 
 		if err != nil {
 			rw.WriteHeader(http.StatusNotFound)
@@ -81,10 +81,10 @@ func GetMetricHandler(repo storage.Repository) http.HandlerFunc {
 	}
 }
 
-func IndexHandler(repo storage.Repository) http.HandlerFunc {
+func IndexHandler(uc *usecase.UseCase) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		var tpl = template.Must(template.ParseFiles("templates/index.html"))
 
-		tpl.Execute(rw, repo.GetAllGauges())
+		tpl.Execute(rw, uc.GetAllMetrics())
 	}
 }

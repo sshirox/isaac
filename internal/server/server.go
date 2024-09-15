@@ -2,6 +2,7 @@ package server
 
 import (
 	"flag"
+	"github.com/sshirox/isaac/internal/usecase"
 	"net/http"
 	"os"
 
@@ -24,7 +25,7 @@ func Run() error {
 	gaugeStore := make(map[string]string)
 	counterStore := make(map[string]string)
 	ms, err := storage.NewMemStorage(gaugeStore, counterStore)
-
+	uc := usecase.New(ms)
 	runAddr := os.Getenv("ADDRESS")
 
 	if runAddr == "" {
@@ -35,9 +36,9 @@ func Run() error {
 		return err
 	}
 
-	r.Post("/update/{metric_type}/{metric_name}/{metric_value}", handler.UpdateMetricsHandler(ms))
-	r.Get("/value/{metric_type}/{metric_name}", handler.GetMetricHandler(ms))
-	r.Get("/", handler.IndexHandler(ms))
+	r.Post("/update/{metric_type}/{metric_name}/{metric_value}", handler.UpdateMetricsHandler(uc))
+	r.Get("/value/{metric_type}/{metric_name}", handler.GetMetricHandler(uc))
+	r.Get("/", handler.IndexHandler(uc))
 
 	err = http.ListenAndServe(runAddr, r)
 

@@ -1,12 +1,13 @@
 package handler
 
 import (
+	"github.com/sshirox/isaac/internal/tests/mocks/mockstorage"
+	"github.com/sshirox/isaac/internal/usecase"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/sshirox/isaac/internal/storage"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -55,15 +56,10 @@ func TestUpdateMetricsHandler(t *testing.T) {
 	}
 
 	r := chi.NewRouter()
-	gaugeStore := make(map[string]string)
-	counterStore := make(map[string]string)
-	ms, err := storage.NewMemStorage(gaugeStore, counterStore)
+	ms := mockstorage.New()
+	uc := usecase.New(ms)
 
-	if err != nil {
-		panic(err)
-	}
-
-	r.Post("/update/{metric_type}/{metric_name}/{metric_value}", UpdateMetricsHandler(ms))
+	r.Post("/update/{metric_type}/{metric_name}/{metric_value}", UpdateMetricsHandler(uc))
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -119,15 +115,10 @@ func TestGetMetricHandler(t *testing.T) {
 	}
 
 	r := chi.NewRouter()
-	gaugeStore := map[string]string{"myMetrc": "789.00"}
-	counterStore := make(map[string]string)
-	ms, err := storage.NewMemStorage(gaugeStore, counterStore)
+	ms := mockstorage.New()
+	uc := usecase.New(ms)
 
-	if err != nil {
-		panic(err)
-	}
-
-	r.Get("/value/{metric_type}/{metric_name}/", GetMetricHandler(ms))
+	r.Get("/value/{metric_type}/{metric_name}/", GetMetricHandler(uc))
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

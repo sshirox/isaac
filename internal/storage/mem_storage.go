@@ -15,12 +15,6 @@ var (
 	metricTypes = []string{GaugeMetricType, CounterMetricType}
 )
 
-type Repository interface {
-	Upsert(string, string, string) error
-	Get(string, string) (string, error)
-	GetAllGauges() map[string]string
-}
-
 type MemStorage struct {
 	Store map[string]map[string]string
 }
@@ -34,19 +28,19 @@ func NewMemStorage(gaugeStore, counterStore map[string]string) (*MemStorage, err
 	return &MemStorage{Store: store}, nil
 }
 
-func (m *MemStorage) Upsert(kind, name, value string) error {
-	switch kind {
+func (m *MemStorage) Upsert(metricType, name, value string) error {
+	switch metricType {
 	case GaugeMetricType:
-		m.Store[kind][name] = value
+		m.Store[metricType][name] = value
 	case CounterMetricType:
-		m.upsertCounterMetric(kind, name, value)
+		m.upsertCounterMetric(metricType, name, value)
 	}
 
 	return nil
 }
 
-func (m *MemStorage) upsertCounterMetric(kind, name, value string) error {
-	if v, ok := m.Store[kind][name]; ok {
+func (m *MemStorage) upsertCounterMetric(metricType, name, value string) error {
+	if v, ok := m.Store[metricType][name]; ok {
 		currVal, err := strconv.Atoi(v)
 		if err != nil {
 			panic(err)
@@ -57,20 +51,20 @@ func (m *MemStorage) upsertCounterMetric(kind, name, value string) error {
 		}
 		updatedVal := currVal + newVal
 		res := strconv.Itoa(updatedVal)
-		m.Store[kind][name] = res
+		m.Store[metricType][name] = res
 	} else {
-		m.Store[kind][name] = value
+		m.Store[metricType][name] = value
 	}
 
 	return nil
 }
 
-func (m *MemStorage) Get(kind, name string) (string, error) {
-	if !slices.Contains(metricTypes, kind) {
+func (m *MemStorage) Get(metricType, name string) (string, error) {
+	if !slices.Contains(metricTypes, metricType) {
 		return "", errors.New("invalid metric type")
 	}
 
-	if val, found := m.Store[kind][name]; found {
+	if val, found := m.Store[metricType][name]; found {
 		return val, nil
 	} else {
 		return "", errors.New("not found metric")
