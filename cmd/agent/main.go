@@ -1,3 +1,9 @@
 package main
 
-func main() {}
+import (
+	"github.com/sshirox/isaac/internal/agent"
+)
+
+func main() {
+	agent.Run()
+}
