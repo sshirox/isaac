@@ -31,6 +31,11 @@ func Run() error {
 	gaugeStore := make(map[string]string)
 	counterStore := make(map[string]string)
 	ms, err := storage.NewMemStorage(gaugeStore, counterStore)
+
+	if err != nil {
+		return err
+	}
+
 	uc := usecase.New(ms)
 
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
