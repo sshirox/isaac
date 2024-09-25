@@ -85,6 +85,7 @@ func IndexHandler(uc *usecase.UseCase) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		var tpl = template.Must(template.ParseFiles("templates/index.html"))
 
+		rw.WriteHeader(http.StatusOK)
 		tpl.Execute(rw, uc.GetAllMetrics())
 	}
 }

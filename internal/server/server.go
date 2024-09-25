@@ -2,7 +2,9 @@ package server
 
 import (
 	"flag"
+	"github.com/sshirox/isaac/internal/logger"
 	"github.com/sshirox/isaac/internal/usecase"
+	"go.uber.org/zap"
 	"net/http"
 	"os"
 
@@ -11,10 +13,14 @@ import (
 	"github.com/sshirox/isaac/internal/storage"
 )
 
-var flagRunAddr string
+var (
+	flagRunAddr  string
+	flagLogLevel string
+)
 
 func parseFlags() {
 	flag.StringVar(&flagRunAddr, "a", ":8080", "address and port to run server")
+	flag.StringVar(&flagLogLevel, "l", "info", "log level")
 	flag.Parse()
 }
 
@@ -26,21 +32,26 @@ func Run() error {
 	counterStore := make(map[string]string)
 	ms, err := storage.NewMemStorage(gaugeStore, counterStore)
 	uc := usecase.New(ms)
-	runAddr := os.Getenv("ADDRESS")
 
-	if runAddr == "" {
-		runAddr = flagRunAddr
+	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
+		flagRunAddr = envRunAddr
 	}
 
-	if err != nil {
+	if envLogLevel := os.Getenv("LOG_LEVEL"); envLogLevel != "" {
+		flagLogLevel = envLogLevel
+	}
+
+	if err = logger.Initialize(flagLogLevel); err != nil {
 		return err
 	}
 
-	r.Post("/update/{metric_type}/{metric_name}/{metric_value}", handler.UpdateMetricsHandler(uc))
-	r.Get("/value/{metric_type}/{metric_name}", handler.GetMetricHandler(uc))
-	r.Get("/", handler.IndexHandler(uc))
+	r.Post("/update/{metric_type}/{metric_name}/{metric_value}", logger.WithLogging(handler.UpdateMetricsHandler(uc)))
+	r.Get("/value/{metric_type}/{metric_name}", logger.WithLogging(handler.GetMetricHandler(uc)))
+	r.Get("/", logger.WithLogging(handler.IndexHandler(uc)))
 
-	err = http.ListenAndServe(runAddr, r)
+	logger.Log.Info("Running server", zap.String("address", flagRunAddr))
+
+	err = http.ListenAndServe(flagRunAddr, r)
 
 	if err != nil {
 		return err
