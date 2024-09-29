@@ -28,15 +28,15 @@ func Run() error {
 	parseFlags()
 
 	r := chi.NewRouter()
-	gaugeStore := make(map[string]string)
-	counterStore := make(map[string]string)
-	ms, err := storage.NewMemStorage(gaugeStore, counterStore)
+	gauges := make(map[string]float64)
+	counters := make(map[string]int64)
+	s, err := storage.NewMemStorage(gauges, counters)
 
 	if err != nil {
 		return err
 	}
 
-	uc := usecase.New(ms)
+	uc := usecase.New(s)
 
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
 		flagRunAddr = envRunAddr
@@ -50,8 +50,8 @@ func Run() error {
 		return err
 	}
 
-	r.Post("/update/{metric_type}/{metric_name}/{metric_value}", logger.WithLogging(handler.UpdateMetricsHandler(uc)))
-	r.Get("/value/{metric_type}/{metric_name}", logger.WithLogging(handler.GetMetricHandler(uc)))
+	r.Post("/update", logger.WithLogging(handler.UpdateMetricsHandler(uc)))
+	r.Post("/value", logger.WithLogging(handler.GetMetricHandler(uc)))
 	r.Get("/", logger.WithLogging(handler.IndexHandler(uc)))
 
 	logger.Log.Info("Running server", zap.String("address", flagRunAddr))

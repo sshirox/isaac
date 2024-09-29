@@ -1,8 +1,11 @@
 package agent
 
 import (
+	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/sshirox/isaac/internal/model"
 	"io"
 	"log/slog"
 	"math/rand"
@@ -24,9 +27,9 @@ var (
 )
 
 const (
+	proto             = "http"
 	gaugeMetricType   = "gauge"
 	counterMetricType = "counter"
-	updateMetricsURL  = "update"
 )
 
 type GaugeMonitor struct {
@@ -65,7 +68,6 @@ type CounterMonitor struct {
 }
 
 func pollMetrics(gm *GaugeMonitor, cm *CounterMonitor, memStats *runtime.MemStats) {
-	// Read full mem stats
 	runtime.ReadMemStats(memStats)
 
 	gm.Alloc = float64(memStats.Alloc)
@@ -168,21 +170,30 @@ func sendReport(client *http.Client, gm GaugeMonitor, cm CounterMonitor) {
 		name := gmv.Type().Field(i).Name
 		value := gmv.Field(i).Interface()
 		if cnvVal, ok := value.(float64); ok {
-			sendGaugeMetric(client, name, fmt.Sprintf("%.2f", cnvVal))
+			sendGaugeMetric(client, name, cnvVal)
 		}
 	}
 
 	sendCounterMetric(client, cm)
 }
 
-func sendGaugeMetric(client *http.Client, name string, value string) {
-	url := fmt.Sprintf("http://%s/%s/%s/%s/%s", serverAddr, updateMetricsURL, gaugeMetricType, name, value)
+func sendGaugeMetric(client *http.Client, name string, value float64) {
+	url := updateMetricsURL()
+	m := model.Metric{
+		ID:    name,
+		MType: gaugeMetricType,
+		Value: &value,
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return
+	}
 
-	req, err := http.NewRequest("POST", url, nil)
+	req, err := http.NewRequest("POST", url, bytes.NewReader(b))
 	if err != nil {
 		panic(err)
 	}
-	req.Header.Add("Content-Type", "text/plain")
+	req.Header.Add("Content-Type", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -201,13 +212,22 @@ func sendGaugeMetric(client *http.Client, name string, value string) {
 }
 
 func sendCounterMetric(client *http.Client, cm CounterMonitor) {
-	url := fmt.Sprintf("http://%s/%s/%s/PollCount/%d", serverAddr, updateMetricsURL, counterMetricType, cm.PollCount)
+	url := updateMetricsURL()
+	m := model.Metric{
+		ID:    "PollCount",
+		MType: counterMetricType,
+		Delta: &cm.PollCount,
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return
+	}
 
-	req, err := http.NewRequest("POST", url, nil)
+	req, err := http.NewRequest("POST", url, bytes.NewReader(b))
 	if err != nil {
 		panic(err)
 	}
-	req.Header.Add("Content-Type", "text/plain")
+	req.Header.Add("Content-Type", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -223,4 +243,8 @@ func sendCounterMetric(client *http.Client, cm CounterMonitor) {
 
 	msg := fmt.Sprintf("Sent counter metric %s", url)
 	slog.Info(msg)
+}
+
+func updateMetricsURL() string {
+	return fmt.Sprintf("%s://%s/%s", proto, serverAddr, "update")
 }

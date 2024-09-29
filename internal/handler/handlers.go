@@ -1,13 +1,14 @@
 package handler
 
 import (
+	"encoding/json"
+	"github.com/sshirox/isaac/internal/model"
 	"github.com/sshirox/isaac/internal/usecase"
 	"html/template"
+	"io"
+	"log/slog"
 	"net/http"
 	"slices"
-	"strconv"
-
-	"github.com/go-chi/chi/v5"
 )
 
 const (
@@ -21,54 +22,60 @@ var (
 
 func UpdateMetricsHandler(uc *usecase.UseCase) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		metricType := chi.URLParam(r, "metric_type")
-		metricName := chi.URLParam(r, "metric_name")
-		metricValue := chi.URLParam(r, "metric_value")
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			panic(err)
+		}
+		var m model.Metric
+		err = json.Unmarshal(body, &m)
+		if err != nil {
+			panic(err)
+		}
 
-		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		rw.Header().Set("Content-Type", "application/json")
 
-		if !slices.Contains(metricTypes, metricType) {
+		if !slices.Contains(metricTypes, m.MType) {
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte(`""`))
 			return
 		}
 
-		if len(metricName) == 0 {
+		if len(m.ID) == 0 {
 			rw.WriteHeader(http.StatusNotFound)
 			rw.Write([]byte(`""`))
 			return
 		}
 
-		switch metricType {
-		case GaugeMetricType:
-			if _, err := strconv.ParseFloat(metricValue, 64); err != nil {
-				rw.WriteHeader(http.StatusBadRequest)
-				rw.Write([]byte(`""`))
-				return
-			}
-		case CounterMetricType:
-			if _, err := strconv.ParseInt(metricValue, 10, 64); err != nil {
-				rw.WriteHeader(http.StatusBadRequest)
-				rw.Write([]byte(`""`))
-				return
-			}
+		updatedMetric := uc.UpsertMetric(m.MType, m.ID, m.Value, m.Delta)
+
+		jsonResp, err := json.Marshal(updatedMetric)
+		if err != nil {
+			slog.Error("marshal response", "err", err)
 		}
 
-		_ = uc.UpsertMetric(metricType, metricName, metricValue)
-
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`""`))
+		_, err = rw.Write(jsonResp)
+		if err != nil {
+			slog.Error("write response", "err", err)
+		}
 	}
 }
 
 func GetMetricHandler(uc *usecase.UseCase) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		metricType := chi.URLParam(r, "metric_type")
-		metricName := chi.URLParam(r, "metric_name")
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			panic(err)
+		}
+		var m model.Metric
+		err = json.Unmarshal(body, &m)
+		if err != nil {
+			panic(err)
+		}
 
-		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		res, err := uc.GetMetric(m.MType, m.ID)
 
-		val, err := uc.GetMetric(metricType, metricName)
+		rw.Header().Set("Content-Type", "application/json")
 
 		if err != nil {
 			rw.WriteHeader(http.StatusNotFound)
@@ -76,8 +83,16 @@ func GetMetricHandler(uc *usecase.UseCase) http.HandlerFunc {
 			return
 		}
 
+		jsonResp, err := json.Marshal(res)
+		if err != nil {
+			slog.Error("marshal response", "err", err)
+		}
+
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(val))
+		_, err = rw.Write(jsonResp)
+		if err != nil {
+			slog.Error("write response", "err", err)
+		}
 	}
 }
 
