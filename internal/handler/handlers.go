@@ -1,8 +1,12 @@
 package handler
 
 import (
+	"encoding/json"
+	"github.com/sshirox/isaac/internal/model"
 	"github.com/sshirox/isaac/internal/usecase"
 	"html/template"
+	"io"
+	"log/slog"
 	"net/http"
 	"slices"
 	"strconv"
@@ -78,6 +82,82 @@ func GetMetricHandler(uc *usecase.UseCase) http.HandlerFunc {
 
 		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte(val))
+	}
+}
+
+func UpdateMetricsJSONHandler(uc *usecase.UseCase) http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			panic(err)
+		}
+		var m model.Metric
+		err = json.Unmarshal(body, &m)
+		if err != nil {
+			panic(err)
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
+
+		if !slices.Contains(metricTypes, m.MType) {
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte(`""`))
+			return
+		}
+
+		if len(m.ID) == 0 {
+			rw.WriteHeader(http.StatusNotFound)
+			rw.Write([]byte(`""`))
+			return
+		}
+
+		updatedMetric := uc.UpdateMetric(m.MType, m.ID, m.Value, m.Delta)
+
+		jsonResp, err := json.Marshal(updatedMetric)
+		if err != nil {
+			slog.Error("marshal response", "err", err)
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		_, err = rw.Write(jsonResp)
+		if err != nil {
+			slog.Error("write response", "err", err)
+		}
+	}
+}
+
+func GetMetricsJSONHandler(uc *usecase.UseCase) http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			panic(err)
+		}
+		var m model.Metric
+		err = json.Unmarshal(body, &m)
+		if err != nil {
+			panic(err)
+		}
+
+		res, err := uc.ReceiveMetric(m.MType, m.ID)
+
+		rw.Header().Set("Content-Type", "application/json")
+
+		if err != nil {
+			rw.WriteHeader(http.StatusNotFound)
+			rw.Write([]byte(`""`))
+			return
+		}
+
+		jsonResp, err := json.Marshal(res)
+		if err != nil {
+			slog.Error("marshal response", "err", err)
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		_, err = rw.Write(jsonResp)
+		if err != nil {
+			slog.Error("write response", "err", err)
+		}
 	}
 }
 

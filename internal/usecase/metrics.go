@@ -1,9 +1,13 @@
 package usecase
 
+import "github.com/sshirox/isaac/internal/model"
+
 type Repository interface {
 	Upsert(string, string, string) error
 	Get(string, string) (string, error)
-	GetAllGauges() map[string]string
+	GetAllGauges() map[string]float64
+	Update(string, string, *float64, *int64) model.Metric
+	Value(string, string) (model.Metric, error)
 }
 
 type UseCase struct {
@@ -35,6 +39,21 @@ func (uc *UseCase) UpsertMetric(metricType, name, value string) error {
 	return nil
 }
 
-func (uc *UseCase) GetAllMetrics() map[string]string {
+func (uc *UseCase) ReceiveMetric(MType, id string) (model.Metric, error) {
+	m, err := uc.repo.Value(MType, id)
+	if err != nil {
+		return m, err
+	} else {
+		return m, nil
+	}
+}
+
+func (uc *UseCase) UpdateMetric(MType, id string, value *float64, delta *int64) model.Metric {
+	m := uc.repo.Update(MType, id, value, delta)
+
+	return m
+}
+
+func (uc *UseCase) GetAllMetrics() map[string]float64 {
 	return uc.repo.GetAllGauges()
 }
