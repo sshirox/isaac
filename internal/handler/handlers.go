@@ -2,170 +2,229 @@ package handler
 
 import (
 	"encoding/json"
-	"github.com/sshirox/isaac/internal/model"
-	"github.com/sshirox/isaac/internal/usecase"
+	"fmt"
+	"github.com/sshirox/isaac/internal/metric"
 	"html/template"
 	"io"
-	"log/slog"
 	"net/http"
-	"slices"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 )
 
-const (
-	GaugeMetricType   = "gauge"
-	CounterMetricType = "counter"
-)
+type Repository interface {
+	UpdateGauge(string, float64)
+	UpdateCounter(string, int64)
+	ReceiveGauge(string) (float64, bool)
+	ReceiveCounter(string) (int64, bool)
+	ReceiveAllGauges() map[string]float64
+	ReceiveAllCounters() map[string]int64
+}
 
-var (
-	metricTypes = []string{GaugeMetricType, CounterMetricType}
-)
-
-func UpdateMetricsHandler(uc *usecase.UseCase) http.HandlerFunc {
+func UpdateMetricsHandler(repo Repository) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		metricType := chi.URLParam(r, "metric_type")
-		metricName := chi.URLParam(r, "metric_name")
-		metricValue := chi.URLParam(r, "metric_value")
+		mType := chi.URLParam(r, "type")
+		name := chi.URLParam(r, "name")
+		value := chi.URLParam(r, "value")
 
 		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
-		if !slices.Contains(metricTypes, metricType) {
+		if len(name) == 0 {
 			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`""`))
+			rw.Write([]byte(`"empty metric name"`))
+			return
+		} else if len(value) == 0 {
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte(`"empty metric value"`))
 			return
 		}
 
-		if len(metricName) == 0 {
-			rw.WriteHeader(http.StatusNotFound)
-			rw.Write([]byte(`""`))
+		switch mType {
+		case metric.GaugeMetricType:
+			val, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				rw.WriteHeader(http.StatusBadRequest)
+				rw.Write([]byte(`"metric value is not a float"`))
+				return
+			}
+			repo.UpdateGauge(name, val)
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`"gauge successfully updated"`))
+		case metric.CounterMetricType:
+			val, err := strconv.ParseInt(value, 10, 64)
+			if err != nil {
+				rw.WriteHeader(http.StatusBadRequest)
+				rw.Write([]byte(`"metric value is not a integer"`))
+				return
+			}
+			repo.UpdateCounter(name, val)
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`"counter successfully updated"`))
+		default:
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte(`"invalid metric type"`))
 			return
 		}
-
-		switch metricType {
-		case GaugeMetricType:
-			if _, err := strconv.ParseFloat(metricValue, 64); err != nil {
-				rw.WriteHeader(http.StatusBadRequest)
-				rw.Write([]byte(`""`))
-				return
-			}
-		case CounterMetricType:
-			if _, err := strconv.ParseInt(metricValue, 10, 64); err != nil {
-				rw.WriteHeader(http.StatusBadRequest)
-				rw.Write([]byte(`""`))
-				return
-			}
-		}
-
-		_ = uc.UpsertMetric(metricType, metricName, metricValue)
-
-		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`""`))
 	}
 }
 
-func GetMetricHandler(uc *usecase.UseCase) http.HandlerFunc {
+func ValueMetricHandler(repo Repository) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		metricType := chi.URLParam(r, "metric_type")
-		metricName := chi.URLParam(r, "metric_name")
+		mType := chi.URLParam(r, "type")
+		name := chi.URLParam(r, "name")
 
 		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
-		val, err := uc.GetMetric(metricType, metricName)
-
-		if err != nil {
-			rw.WriteHeader(http.StatusNotFound)
-			rw.Write([]byte(`""`))
-			return
-		}
-
-		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(val))
-	}
-}
-
-func UpdateMetricsJSONHandler(uc *usecase.UseCase) http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			panic(err)
-		}
-		var m model.Metric
-		err = json.Unmarshal(body, &m)
-		if err != nil {
-			panic(err)
-		}
-
-		rw.Header().Set("Content-Type", "application/json")
-
-		if !slices.Contains(metricTypes, m.MType) {
+		switch mType {
+		case metric.GaugeMetricType:
+			val, ok := repo.ReceiveGauge(name)
+			if !ok {
+				rw.WriteHeader(http.StatusNotFound)
+				rw.Write([]byte(`"metric not found"`))
+			}
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(strconv.FormatFloat(val, 'g', -1, 64)))
+		case metric.CounterMetricType:
+			val, ok := repo.ReceiveCounter(name)
+			if !ok {
+				rw.WriteHeader(http.StatusNotFound)
+				rw.Write([]byte(`"metric not found"`))
+			}
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(fmt.Sprintf("%d", val)))
+		default:
 			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`""`))
-			return
-		}
-
-		if len(m.ID) == 0 {
-			rw.WriteHeader(http.StatusNotFound)
-			rw.Write([]byte(`""`))
-			return
-		}
-
-		updatedMetric := uc.UpdateMetric(m.MType, m.ID, m.Value, m.Delta)
-
-		jsonResp, err := json.Marshal(updatedMetric)
-		if err != nil {
-			slog.Error("marshal response", "err", err)
-		}
-
-		rw.WriteHeader(http.StatusOK)
-		_, err = rw.Write(jsonResp)
-		if err != nil {
-			slog.Error("write response", "err", err)
+			rw.Write([]byte(`"invalid metric type"`))
 		}
 	}
 }
 
-func GetMetricsJSONHandler(uc *usecase.UseCase) http.HandlerFunc {
+func UpdateByContentTypeHandler(repo Repository) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			panic(err)
-		}
-		var m model.Metric
-		err = json.Unmarshal(body, &m)
-		if err != nil {
-			panic(err)
-		}
+		contentType := r.Header.Get("Content-type")
+		if contentType == "application/json" {
+			rw.Header().Set("Content-Type", "application/json")
 
-		res, err := uc.ReceiveMetric(m.MType, m.ID)
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				rw.WriteHeader(http.StatusBadRequest)
+				rw.Write([]byte(`"invalid body"`))
+				return
+			}
+			var m metric.Metrics
+			err = json.Unmarshal(body, &m)
+			if err != nil {
+				rw.WriteHeader(http.StatusBadRequest)
+				rw.Write([]byte(`"invalid json body"`))
+				return
+			}
 
-		rw.Header().Set("Content-Type", "application/json")
+			switch m.MType {
+			case metric.GaugeMetricType:
+				id, value := m.ID, m.Value
+				if value == nil {
+					rw.WriteHeader(http.StatusBadRequest)
+					rw.Write([]byte(`"empty value"`))
+					return
+				}
+				repo.UpdateGauge(id, *value)
+				newVal, _ := repo.ReceiveGauge(id)
+				m.Value = &newVal
 
-		if err != nil {
-			rw.WriteHeader(http.StatusNotFound)
-			rw.Write([]byte(`""`))
-			return
-		}
+				rw.WriteHeader(http.StatusOK)
+				json.NewEncoder(rw).Encode(m)
+			case metric.CounterMetricType:
+				id, delta := m.ID, m.Delta
+				if delta == nil {
+					rw.WriteHeader(http.StatusBadRequest)
+					rw.Write([]byte(`"empty delta"`))
+					return
+				}
+				repo.UpdateCounter(id, *delta)
+				newDelta, _ := repo.ReceiveCounter(id)
+				m.Delta = &newDelta
 
-		jsonResp, err := json.Marshal(res)
-		if err != nil {
-			slog.Error("marshal response", "err", err)
-		}
-
-		rw.WriteHeader(http.StatusOK)
-		_, err = rw.Write(jsonResp)
-		if err != nil {
-			slog.Error("write response", "err", err)
+				rw.WriteHeader(http.StatusOK)
+				json.NewEncoder(rw).Encode(m)
+			default:
+				rw.WriteHeader(http.StatusBadRequest)
+				rw.Write([]byte(`"invalid metric type"`))
+			}
+		} else {
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte(`"invalid content type"`))
 		}
 	}
 }
 
-func IndexHandler(uc *usecase.UseCase) http.HandlerFunc {
+func ValueByContentTypeHandler(repo Repository) http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		contentType := r.Header.Get("Content-type")
+		if contentType == "application/json" {
+			rw.Header().Set("Content-Type", "application/json")
+
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				rw.WriteHeader(http.StatusBadRequest)
+				rw.Write([]byte(`"invalid body"`))
+				return
+			}
+			var m metric.Metrics
+			err = json.Unmarshal(body, &m)
+			if err != nil {
+				rw.WriteHeader(http.StatusBadRequest)
+				rw.Write([]byte(`"invalid json body"`))
+				return
+			}
+
+			id := m.ID
+			switch m.MType {
+			case metric.GaugeMetricType:
+				value, ok := repo.ReceiveGauge(id)
+				if !ok {
+					rw.WriteHeader(http.StatusNotFound)
+					rw.Write([]byte(`"metric not found"`))
+					return
+				}
+				m.Value = &value
+
+				rw.WriteHeader(http.StatusOK)
+				json.NewEncoder(rw).Encode(m)
+			case metric.CounterMetricType:
+				delta, ok := repo.ReceiveCounter(id)
+				if !ok {
+					rw.WriteHeader(http.StatusNotFound)
+					rw.Write([]byte(`"metric not found"`))
+					return
+				}
+				m.Delta = &delta
+
+				rw.WriteHeader(http.StatusOK)
+				json.NewEncoder(rw).Encode(m)
+			default:
+				rw.WriteHeader(http.StatusBadRequest)
+				rw.Write([]byte(`"invalid metric type"`))
+			}
+		} else {
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte(`"invalid content type"`))
+		}
+	}
+}
+
+func IndexHandler(repo Repository) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		var tpl = template.Must(template.ParseFiles("templates/index.html"))
+		type metrics struct {
+			Gauges   map[string]float64
+			Counters map[string]int64
+		}
+		m := &metrics{
+			Gauges:   repo.ReceiveAllGauges(),
+			Counters: repo.ReceiveAllCounters(),
+		}
 
 		rw.WriteHeader(http.StatusOK)
-		tpl.Execute(rw, uc.GetAllMetrics())
+		tpl.Execute(rw, m)
 	}
 }

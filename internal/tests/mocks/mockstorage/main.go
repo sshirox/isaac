@@ -2,7 +2,7 @@ package mockstorage
 
 import (
 	"errors"
-	"github.com/sshirox/isaac/internal/model"
+	"github.com/sshirox/isaac/internal/metric"
 	"log/slog"
 	"slices"
 )
@@ -22,7 +22,7 @@ type MockStorage struct {
 }
 
 func New(gauges map[string]float64, counters map[string]int64) *MockStorage {
-    return &MockStorage{Gauges: gauges, Counters: counters}
+	return &MockStorage{Gauges: gauges, Counters: counters}
 }
 
 func (m *MockStorage) Upsert(_, _, _ string) error {
@@ -43,19 +43,19 @@ func (m *MockStorage) Get(metricType, name string) (string, error) {
 	}
 }
 
-func (m *MockStorage) Update(MType, id string, value *float64, delta *int64) model.Metric {
+func (m *MockStorage) Update(MType, id string, value *float64, delta *int64) metric.Metrics {
 	slog.Info("upsert metric", "MType", MType, "ID", id, "value", value, "delta", delta)
 
-	return model.Metric{}
+	return metric.Metrics{}
 }
 
-func (m *MockStorage) Value(MType, id string) (model.Metric, error) {
+func (m *MockStorage) Value(MType, id string) (metric.Metrics, error) {
 	if !slices.Contains(metricTypes, MType) {
-		return model.Metric{}, errors.New("invalid metric type")
+		return metric.Metrics{}, errors.New("invalid metric type")
 	}
 
 	if value, found := m.Gauges[id]; found {
-		metric := model.Metric{
+		metric := metric.Metrics{
 			ID:    id,
 			MType: GaugeMetricType,
 			Delta: nil,
@@ -63,7 +63,7 @@ func (m *MockStorage) Value(MType, id string) (model.Metric, error) {
 		}
 		return metric, nil
 	} else if delta, found := m.Counters[id]; found {
-		metric := model.Metric{
+		metric := metric.Metrics{
 			ID:    id,
 			MType: CounterMetricType,
 			Delta: &delta,
@@ -71,7 +71,7 @@ func (m *MockStorage) Value(MType, id string) (model.Metric, error) {
 		}
 		return metric, nil
 	} else {
-		return model.Metric{}, errors.New("not found metric")
+		return metric.Metrics{}, errors.New("not found metric")
 	}
 }
 

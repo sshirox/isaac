@@ -3,7 +3,7 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/sshirox/isaac/internal/model"
+	"github.com/sshirox/isaac/internal/metric"
 	"github.com/sshirox/isaac/internal/tests/mocks/mockstorage"
 	"github.com/sshirox/isaac/internal/usecase"
 	"net/http"
@@ -199,7 +199,7 @@ func TestUpdateMetricsJSONHandler(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			m := model.Metric{
+			m := metric.Metric{
 				ID:    tc.metricID,
 				MType: tc.metricType,
 				Value: &tc.metricValue,
@@ -271,7 +271,7 @@ func TestGetMetricJSONHandler(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			m := model.Metric{
+			m := metric.Metric{
 				ID:    tc.metricID,
 				MType: tc.metricType,
 			}
