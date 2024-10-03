@@ -31,11 +31,11 @@ func UpdateMetricsHandler(repo Repository) http.HandlerFunc {
 
 		if len(name) == 0 {
 			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`"empty metric name"`))
+			rw.Write([]byte("empty metric name"))
 			return
 		} else if len(value) == 0 {
 			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`"empty metric value"`))
+			rw.Write([]byte("empty metric value"))
 			return
 		}
 
@@ -44,25 +44,25 @@ func UpdateMetricsHandler(repo Repository) http.HandlerFunc {
 			val, err := strconv.ParseFloat(value, 64)
 			if err != nil {
 				rw.WriteHeader(http.StatusBadRequest)
-				rw.Write([]byte(`"metric value is not a float"`))
+				rw.Write([]byte("metric value is not a float"))
 				return
 			}
 			repo.UpdateGauge(name, val)
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`"gauge successfully updated"`))
+			rw.Write([]byte("gauge successfully updated"))
 		case metric.CounterMetricType:
 			val, err := strconv.ParseInt(value, 10, 64)
 			if err != nil {
 				rw.WriteHeader(http.StatusBadRequest)
-				rw.Write([]byte(`"metric value is not a integer"`))
+				rw.Write([]byte("metric value is not a integer"))
 				return
 			}
 			repo.UpdateCounter(name, val)
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`"counter successfully updated"`))
+			rw.Write([]byte("counter successfully updated"))
 		default:
 			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`"invalid metric type"`))
+			rw.Write([]byte("invalid metric type"))
 			return
 		}
 	}
@@ -80,7 +80,8 @@ func ValueMetricHandler(repo Repository) http.HandlerFunc {
 			val, ok := repo.ReceiveGauge(name)
 			if !ok {
 				rw.WriteHeader(http.StatusNotFound)
-				rw.Write([]byte(`"metric not found"`))
+				rw.Write([]byte("metric not found"))
+				return
 			}
 			rw.WriteHeader(http.StatusOK)
 			rw.Write([]byte(strconv.FormatFloat(val, 'g', -1, 64)))
@@ -88,13 +89,14 @@ func ValueMetricHandler(repo Repository) http.HandlerFunc {
 			val, ok := repo.ReceiveCounter(name)
 			if !ok {
 				rw.WriteHeader(http.StatusNotFound)
-				rw.Write([]byte(`"metric not found"`))
+				rw.Write([]byte("metric not found"))
+				return
 			}
 			rw.WriteHeader(http.StatusOK)
 			rw.Write([]byte(fmt.Sprintf("%d", val)))
 		default:
 			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`"invalid metric type"`))
+			rw.Write([]byte("invalid metric type"))
 		}
 	}
 }
@@ -108,14 +110,14 @@ func UpdateByContentTypeHandler(repo Repository) http.HandlerFunc {
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
 				rw.WriteHeader(http.StatusBadRequest)
-				rw.Write([]byte(`"invalid body"`))
+				rw.Write([]byte("invalid body"))
 				return
 			}
 			var m metric.Metrics
 			err = json.Unmarshal(body, &m)
 			if err != nil {
 				rw.WriteHeader(http.StatusBadRequest)
-				rw.Write([]byte(`"invalid json body"`))
+				rw.Write([]byte("invalid json body"))
 				return
 			}
 
@@ -124,7 +126,7 @@ func UpdateByContentTypeHandler(repo Repository) http.HandlerFunc {
 				id, value := m.ID, m.Value
 				if value == nil {
 					rw.WriteHeader(http.StatusBadRequest)
-					rw.Write([]byte(`"empty value"`))
+					rw.Write([]byte("empty value"))
 					return
 				}
 				repo.UpdateGauge(id, *value)
@@ -137,7 +139,7 @@ func UpdateByContentTypeHandler(repo Repository) http.HandlerFunc {
 				id, delta := m.ID, m.Delta
 				if delta == nil {
 					rw.WriteHeader(http.StatusBadRequest)
-					rw.Write([]byte(`"empty delta"`))
+					rw.Write([]byte("empty delta"))
 					return
 				}
 				repo.UpdateCounter(id, *delta)
@@ -148,11 +150,11 @@ func UpdateByContentTypeHandler(repo Repository) http.HandlerFunc {
 				json.NewEncoder(rw).Encode(m)
 			default:
 				rw.WriteHeader(http.StatusBadRequest)
-				rw.Write([]byte(`"invalid metric type"`))
+				rw.Write([]byte("invalid metric type"))
 			}
 		} else {
 			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`"invalid content type"`))
+			rw.Write([]byte("invalid content type"))
 		}
 	}
 }
@@ -166,14 +168,14 @@ func ValueByContentTypeHandler(repo Repository) http.HandlerFunc {
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
 				rw.WriteHeader(http.StatusBadRequest)
-				rw.Write([]byte(`"invalid body"`))
+				rw.Write([]byte("invalid body"))
 				return
 			}
 			var m metric.Metrics
 			err = json.Unmarshal(body, &m)
 			if err != nil {
 				rw.WriteHeader(http.StatusBadRequest)
-				rw.Write([]byte(`"invalid json body"`))
+				rw.Write([]byte("invalid json body"))
 				return
 			}
 
@@ -183,7 +185,7 @@ func ValueByContentTypeHandler(repo Repository) http.HandlerFunc {
 				value, ok := repo.ReceiveGauge(id)
 				if !ok {
 					rw.WriteHeader(http.StatusNotFound)
-					rw.Write([]byte(`"metric not found"`))
+					rw.Write([]byte("metric not found"))
 					return
 				}
 				m.Value = &value
@@ -194,7 +196,7 @@ func ValueByContentTypeHandler(repo Repository) http.HandlerFunc {
 				delta, ok := repo.ReceiveCounter(id)
 				if !ok {
 					rw.WriteHeader(http.StatusNotFound)
-					rw.Write([]byte(`"metric not found"`))
+					rw.Write([]byte("metric not found"))
 					return
 				}
 				m.Delta = &delta
@@ -203,11 +205,11 @@ func ValueByContentTypeHandler(repo Repository) http.HandlerFunc {
 				json.NewEncoder(rw).Encode(m)
 			default:
 				rw.WriteHeader(http.StatusBadRequest)
-				rw.Write([]byte(`"invalid metric type"`))
+				rw.Write([]byte("invalid metric type"))
 			}
 		} else {
 			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte(`"invalid content type"`))
+			rw.Write([]byte("invalid content type"))
 		}
 	}
 }

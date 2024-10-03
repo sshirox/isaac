@@ -4,8 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/sshirox/isaac/internal/metric"
-	"github.com/sshirox/isaac/internal/tests/mocks/mockstorage"
-	"github.com/sshirox/isaac/internal/usecase"
+	"github.com/sshirox/isaac/internal/storage"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,6 +17,7 @@ func TestUpdateMetricsHandler(t *testing.T) {
 	type want struct {
 		contentType string
 		statusCode  int
+		body        string
 	}
 	testCases := []struct {
 		name    string
@@ -25,46 +25,65 @@ func TestUpdateMetricsHandler(t *testing.T) {
 		want    want
 	}{
 		{
-			name: "Valid metric",
+			name: "Valid gauge metric",
 			want: want{
 				contentType: "text/plain; charset=utf-8",
 				statusCode:  200,
+				body:        "gauge successfully updated",
 			},
-			request: "/update/gauge/someMetric/789",
+			request: "/update/gauge/Alloc/78910987.77",
 		},
 		{
-			name: "Invalid metric type",
+			name: "Valid counter metric",
 			want: want{
 				contentType: "text/plain; charset=utf-8",
-				statusCode:  400,
+				statusCode:  200,
+				body:        "counter successfully updated",
 			},
-			request: "/update/metric/someMetric/789",
+			request: "/update/counter/PollCount/10",
 		},
 		{
 			name: "Empty metric name",
 			want: want{
 				contentType: "text/plain; charset=utf-8",
-				statusCode:  404,
+				statusCode:  400,
+				body:        "empty metric name",
 			},
-			request: "/update/gauge/789",
+			request: "/update/gauge//78910987.77",
+		},
+		{
+			name: "Empty metric value",
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  404,
+				body:        "404 page not found\n",
+			},
+			request: "/update/gauge/Alloc/",
 		},
 		{
 			name: "Invalid metric value",
 			want: want{
 				contentType: "text/plain; charset=utf-8",
 				statusCode:  400,
+				body:        "metric value is not a float",
 			},
-			request: "/update/gauge/someMetric/abc",
+			request: "/update/gauge/Alloc/invalid",
+		},
+		{
+			name: "Invalid metric type",
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  400,
+				body:        "metric value is not a float",
+			},
+			request: "/update/gauge/Alloc/invalid",
 		},
 	}
 
 	r := chi.NewRouter()
-	gauges := make(map[string]float64)
-	counters := make(map[string]int64)
-	ms := mockstorage.New(gauges, counters)
-	uc := usecase.New(ms)
+	s := storage.NewMemStorage()
 
-	r.Post("/update/{metric_type}/{metric_name}/{metric_value}", UpdateMetricsHandler(uc))
+	r.Post("/update/{type}/{name}/{value}", UpdateMetricsHandler(s))
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -79,14 +98,16 @@ func TestUpdateMetricsHandler(t *testing.T) {
 
 			assert.Equal(t, tc.want.statusCode, result.StatusCode)
 			assert.Equal(t, tc.want.contentType, result.Header.Get("Content-Type"))
+			assert.Equal(t, tc.want.body, w.Body.String())
 		})
 	}
 }
 
-func TestGetMetricHandler(t *testing.T) {
+func TestValueMetricHandler(t *testing.T) {
 	type want struct {
 		contentType string
 		statusCode  int
+		body        string
 	}
 	testCases := []struct {
 		name    string
@@ -94,38 +115,58 @@ func TestGetMetricHandler(t *testing.T) {
 		want    want
 	}{
 		{
-			name: "Valid metric",
+			name: "Success gauge metric",
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  200,
+				body:        "789765.77",
+			},
+			request: "/value/gauge/Alloc/",
+		},
+		{
+			name: "Success counter metric",
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  200,
+				body:        "10",
+			},
+			request: "/value/counter/PollCount/",
+		},
+		{
+			name: "Not found gauge metric",
 			want: want{
 				contentType: "text/plain; charset=utf-8",
 				statusCode:  404,
+				body:        "metric not found",
 			},
-			request: "/value/gauge/myMetric",
+			request: "/value/gauge/Alloc1/",
+		},
+		{
+			name: "Not found counter metric",
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  404,
+				body:        "metric not found",
+			},
+			request: "/value/counter/PollCount1/",
 		},
 		{
 			name: "Invalid metric type",
 			want: want{
 				contentType: "text/plain; charset=utf-8",
-				statusCode:  404,
+				statusCode:  400,
+				body:        "invalid metric type",
 			},
-			request: "/value/metric/myMetric",
-		},
-		{
-			name: "Not exist metric",
-			want: want{
-				contentType: "text/plain; charset=utf-8",
-				statusCode:  404,
-			},
-			request: "/value/gauge/someMetric",
+			request: "/value/invalid/PollCount/",
 		},
 	}
 
 	r := chi.NewRouter()
-	gauges := make(map[string]float64)
-	counters := make(map[string]int64)
-	ms := mockstorage.New(gauges, counters)
-	uc := usecase.New(ms)
+	s := storage.NewMemStorage()
+	s.UpdateGauge("Alloc", 789765.77)
+	s.UpdateCounter("PollCount", 10)
 
-	r.Get("/value/{metric_type}/{metric_name}/", GetMetricHandler(uc))
+	r.Get("/value/{type}/{name}/", ValueMetricHandler(s))
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -140,11 +181,12 @@ func TestGetMetricHandler(t *testing.T) {
 
 			assert.Equal(t, tc.want.statusCode, result.StatusCode)
 			assert.Equal(t, tc.want.contentType, result.Header.Get("Content-Type"))
+			assert.Equal(t, tc.want.body, w.Body.String())
 		})
 	}
 }
 
-func TestUpdateMetricsJSONHandler(t *testing.T) {
+func TestUpdateByContentTypeHandler(t *testing.T) {
 	type want struct {
 		contentType string
 		statusCode  int
@@ -170,36 +212,23 @@ func TestUpdateMetricsJSONHandler(t *testing.T) {
 		{
 			name:        "Invalid metric type",
 			metricID:    "TotalAlloc",
-			metricType:  "invalid",
+			metricType:  "TotalAlloc1",
 			metricValue: 199840.0,
 			want: want{
 				contentType: "application/json",
 				statusCode:  400,
 			},
 		},
-		{
-			name:        "Empty metric name",
-			metricID:    "",
-			metricType:  "gauge",
-			metricValue: 199840.0,
-			want: want{
-				contentType: "application/json",
-				statusCode:  404,
-			},
-		},
 	}
 
 	r := chi.NewRouter()
-	gauges := make(map[string]float64)
-	counters := make(map[string]int64)
-	ms := mockstorage.New(gauges, counters)
-	uc := usecase.New(ms)
+	s := storage.NewMemStorage()
 
-	r.Post("/update", UpdateMetricsJSONHandler(uc))
+	r.Post("/update", UpdateByContentTypeHandler(s))
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			m := metric.Metric{
+			m := metric.Metrics{
 				ID:    tc.metricID,
 				MType: tc.metricType,
 				Value: &tc.metricValue,
@@ -207,6 +236,7 @@ func TestUpdateMetricsJSONHandler(t *testing.T) {
 			b, _ := json.Marshal(m)
 
 			request := httptest.NewRequest(http.MethodPost, "/update", bytes.NewReader(b))
+			request.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
 			r.ServeHTTP(w, request)
@@ -234,7 +264,7 @@ func TestGetMetricJSONHandler(t *testing.T) {
 	}{
 		{
 			name:       "Valid metric",
-			metricID:   "TotalAlloc",
+			metricID:   "Alloc",
 			metricType: "gauge",
 			want: want{
 				contentType: "application/json",
@@ -243,16 +273,16 @@ func TestGetMetricJSONHandler(t *testing.T) {
 		},
 		{
 			name:       "Invalid metric type",
-			metricID:   "TotalAlloc",
+			metricID:   "Alloc",
 			metricType: "invalid",
 			want: want{
 				contentType: "application/json",
-				statusCode:  404,
+				statusCode:  400,
 			},
 		},
 		{
 			name:       "Not exist metric",
-			metricID:   "NotExist",
+			metricID:   "Alloc1",
 			metricType: "gauge",
 			want: want{
 				contentType: "application/json",
@@ -262,22 +292,21 @@ func TestGetMetricJSONHandler(t *testing.T) {
 	}
 
 	r := chi.NewRouter()
-	gauges := map[string]float64{"TotalAlloc": 199840}
-	counters := map[string]int64{"PollCount": 10}
-	ms := mockstorage.New(gauges, counters)
-	uc := usecase.New(ms)
+	s := storage.NewMemStorage()
+	s.UpdateGauge("Alloc", 789765.77)
 
-	r.Post("/value", GetMetricsJSONHandler(uc))
+	r.Post("/value", ValueByContentTypeHandler(s))
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			m := metric.Metric{
+			m := metric.Metrics{
 				ID:    tc.metricID,
 				MType: tc.metricType,
 			}
 			b, _ := json.Marshal(m)
 
 			request := httptest.NewRequest(http.MethodPost, "/value", bytes.NewReader(b))
+			request.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
 			r.ServeHTTP(w, request)
