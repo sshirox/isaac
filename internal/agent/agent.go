@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"github.com/sshirox/isaac/internal/metric"
@@ -146,13 +147,28 @@ func (mt *Monitor) processReport() error {
 func sendMetric(metric metric.Metrics) error {
 	marshaledMetric, err := json.Marshal(metric)
 	if err != nil {
-		slog.Error("marshaling metric", "err", metric)
+		slog.Error("marshaling metric", "error", metric)
+		return err
+	}
+	compressedBody, err := compressBody(marshaledMetric)
+	if err != nil {
 		return err
 	}
 
-	resp, err := http.Post(sendMetricAddr(), "application/json", bytes.NewReader(marshaledMetric))
+	req, err := http.NewRequest(http.MethodPost, sendMetricAddr(), &compressedBody)
 	if err != nil {
-		slog.Error("sending metric", "err", metric)
+		slog.Error("create request", "error", err)
+		return err
+	}
+
+	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("Accept-Encoding", "gzip")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+
+	if err != nil {
+		slog.Error("sending metric", "error", metric)
 	} else {
 		defer resp.Body.Close()
 
@@ -166,6 +182,28 @@ func sendMetric(metric metric.Metrics) error {
 	}
 
 	return nil
+}
+
+func compressBody(body []byte) (bytes.Buffer, error) {
+	var buf bytes.Buffer
+	zw, err := gzip.NewWriterLevel(&buf, gzip.BestCompression)
+
+	if err != nil {
+		slog.Error("create compress writer", "error", err)
+		return buf, err
+	}
+
+	if _, err = zw.Write(body); err != nil {
+		slog.Error("compress metric body", "error", err)
+		return buf, err
+	}
+
+	if err = zw.Close(); err != nil {
+		slog.Error("close compress writer", "error", err)
+		return buf, err
+	}
+
+	return buf, nil
 }
 
 func sendMetricAddr() string {

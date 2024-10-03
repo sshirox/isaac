@@ -3,13 +3,12 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/go-chi/chi/v5"
 	"github.com/sshirox/isaac/internal/metric"
 	"html/template"
 	"io"
 	"net/http"
 	"strconv"
-
-	"github.com/go-chi/chi/v5"
 )
 
 type Repository interface {

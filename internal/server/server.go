@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/sshirox/isaac/internal/compress"
 	"github.com/sshirox/isaac/internal/handler"
 	"github.com/sshirox/isaac/internal/logger"
 	"github.com/sshirox/isaac/internal/storage"
@@ -25,12 +26,12 @@ func Run() error {
 
 	r.Get("/", logger.WithLogging(handler.IndexHandler(s)))
 	r.Route("/update", func(r chi.Router) {
-		r.Post("/", logger.WithLogging(handler.UpdateByContentTypeHandler(s)))
-		r.Post("/{type}/{name}/{value}", logger.WithLogging(handler.UpdateMetricsHandler(s)))
+		r.Post("/", compress.GzipMiddleware(logger.WithLogging(handler.UpdateByContentTypeHandler(s))))
+		r.Post("/{type}/{name}/{value}", compress.GzipMiddleware(logger.WithLogging(handler.UpdateMetricsHandler(s))))
 	})
 	r.Route("/value", func(r chi.Router) {
-		r.Post("/", logger.WithLogging(handler.ValueByContentTypeHandler(s)))
-		r.Get("/{type}/{name}", logger.WithLogging(handler.ValueMetricHandler(s)))
+		r.Post("/", compress.GzipMiddleware(logger.WithLogging(handler.ValueByContentTypeHandler(s))))
+		r.Get("/{type}/{name}", compress.GzipMiddleware(logger.WithLogging(handler.ValueByContentTypeHandler(s))))
 	})
 
 	logger.Log.Info("Running server", zap.String("address", flagRunAddr))
