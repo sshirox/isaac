@@ -2,10 +2,10 @@ package server
 
 import (
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/sshirox/isaac/internal/compress"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/sshirox/isaac/internal/handler"
 	"github.com/sshirox/isaac/internal/logger"
+	"github.com/sshirox/isaac/internal/middleware"
 	"github.com/sshirox/isaac/internal/storage"
 	"go.uber.org/zap"
 	"net/http"
@@ -21,9 +21,9 @@ func Run() error {
 	}
 
 	r := chi.NewRouter()
-	r.Use(middleware.Recoverer)
+	r.Use(chimiddleware.Recoverer)
 	r.Use(logger.WithLogging)
-	r.Use(compress.GZipMiddleware)
+	r.Use(middleware.GZipMiddleware)
 	s := storage.NewMemStorage()
 
 	r.Get("/", handler.IndexHandler(s))

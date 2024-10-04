@@ -2,10 +2,10 @@ package agent
 
 import (
 	"bytes"
-	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"github.com/go-resty/resty/v2"
+	"github.com/sshirox/isaac/internal/compress"
 	"github.com/sshirox/isaac/internal/metric"
 	"log/slog"
 	"math/rand"
@@ -149,7 +149,7 @@ func sendMetric(metric metric.Metrics) error {
 	if err := json.NewEncoder(&buf).Encode(metric); err != nil {
 		return err
 	}
-	compressed, err := compress(buf.Bytes())
+	compressed, err := compress.GZipCompress(buf.Bytes())
 	if err != nil {
 		return err
 	}
@@ -174,22 +174,6 @@ func sendMetric(metric metric.Metrics) error {
 	}
 
 	return nil
-}
-
-func compress(src []byte) ([]byte, error) {
-	var buf bytes.Buffer
-	gz := gzip.NewWriter(&buf)
-	if _, err := gz.Write(src); err != nil {
-		return nil, err
-	}
-	if err := gz.Flush(); err != nil {
-		return nil, err
-	}
-	if err := gz.Close(); err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
 }
 
 func sendMetricAddr() string {
