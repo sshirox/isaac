@@ -22,16 +22,18 @@ func Run() error {
 
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
+	r.Use(logger.WithLogging)
+	r.Use(compress.GZipMiddleware)
 	s := storage.NewMemStorage()
 
-	r.Get("/", logger.WithLogging(handler.IndexHandler(s)))
+	r.Get("/", handler.IndexHandler(s))
 	r.Route("/update", func(r chi.Router) {
-		r.Post("/", compress.GzipMiddleware(logger.WithLogging(handler.UpdateByContentTypeHandler(s))))
-		r.Post("/{type}/{name}/{value}", compress.GzipMiddleware(logger.WithLogging(handler.UpdateMetricsHandler(s))))
+		r.Post("/", handler.UpdateByContentTypeHandler(s))
+		r.Post("/{type}/{name}/{value}", handler.UpdateMetricsHandler(s))
 	})
 	r.Route("/value", func(r chi.Router) {
-		r.Post("/", compress.GzipMiddleware(logger.WithLogging(handler.ValueByContentTypeHandler(s))))
-		r.Get("/{type}/{name}", compress.GzipMiddleware(logger.WithLogging(handler.ValueByContentTypeHandler(s))))
+		r.Post("/", handler.ValueByContentTypeHandler(s))
+		r.Get("/{type}/{name}", handler.ValueByContentTypeHandler(s))
 	})
 
 	logger.Log.Info("Running server", zap.String("address", flagRunAddr))

@@ -205,7 +205,7 @@ func TestUpdateByContentTypeHandler(t *testing.T) {
 			metricType:  "gauge",
 			metricValue: 199840.0,
 			want: want{
-				contentType: "application/json",
+				contentType: "application/json; charset=utf-8",
 				statusCode:  200,
 			},
 		},
@@ -215,7 +215,7 @@ func TestUpdateByContentTypeHandler(t *testing.T) {
 			metricType:  "TotalAlloc1",
 			metricValue: 199840.0,
 			want: want{
-				contentType: "application/json",
+				contentType: "application/json; charset=utf-8",
 				statusCode:  400,
 			},
 		},
@@ -267,7 +267,7 @@ func TestGetMetricJSONHandler(t *testing.T) {
 			metricID:   "Alloc",
 			metricType: "gauge",
 			want: want{
-				contentType: "application/json",
+				contentType: "application/json; charset=utf-8",
 				statusCode:  200,
 			},
 		},
@@ -276,7 +276,7 @@ func TestGetMetricJSONHandler(t *testing.T) {
 			metricID:   "Alloc",
 			metricType: "invalid",
 			want: want{
-				contentType: "application/json",
+				contentType: "application/json; charset=utf-8",
 				statusCode:  400,
 			},
 		},
@@ -285,7 +285,7 @@ func TestGetMetricJSONHandler(t *testing.T) {
 			metricID:   "Alloc1",
 			metricType: "gauge",
 			want: want{
-				contentType: "application/json",
+				contentType: "application/json; charset=utf-8",
 				statusCode:  404,
 			},
 		},
