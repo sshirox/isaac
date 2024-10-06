@@ -1,136 +1,91 @@
 package agent
 
 import (
-	"flag"
+	"bytes"
+	"encoding/json"
 	"fmt"
-	"io"
+	"github.com/go-resty/resty/v2"
+	"github.com/sshirox/isaac/internal/compress"
+	"github.com/sshirox/isaac/internal/metric"
 	"log/slog"
 	"math/rand"
 	"net/http"
 	"os"
-	"reflect"
 	"runtime"
 	"strconv"
 	"time"
 )
 
-var (
-	flagServerAddr     string
-	flagReportInterval int64
-	flagPollInterval   int64
-	serverAddr         string
-	reportInterval     int64
-	pollInterval       int64
-)
-
 const (
-	gaugeMetricType   = "gauge"
-	counterMetricType = "counter"
-	updateMetricsURL  = "update"
+	proto             = "http"
+	updateMetricsPath = "update"
 )
 
-type GaugeMonitor struct {
-	Alloc         float64
-	BuckHashSys   float64
-	Frees         float64
-	GCCPUFraction float64
-	GCSys         float64
-	HeapAlloc     float64
-	HeapIdle      float64
-	HeapInuse     float64
-	HeapObjects   float64
-	HeapReleased  float64
-	HeapSys       float64
-	LastGC        float64
-	Lookups       float64
-	MCacheInuse   float64
-	MCacheSys     float64
-	MSpanInuse    float64
-	MSpanSys      float64
-	Mallocs       float64
-	NextGC        float64
-	NumForcedGC   float64
-	NumGC         float64
-	OtherSys      float64
-	PauseTotalNs  float64
-	StackInuse    float64
-	StackSys      float64
-	Sys           float64
-	TotalAlloc    float64
-	RandomValue   float64
+type Monitor struct {
+	gauges    map[string]float64
+	pollCount int64
 }
 
-type CounterMonitor struct {
-	PollCount int64
-}
+func (mt *Monitor) pollMetrics() {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
 
-func pollMetrics(gm *GaugeMonitor, cm *CounterMonitor, memStats *runtime.MemStats) {
-	// Read full mem stats
-	runtime.ReadMemStats(memStats)
+	gauges := map[string]float64{
+		"Alloc":         float64(m.Alloc),
+		"BuckHashSys":   float64(m.BuckHashSys),
+		"Frees":         float64(m.Frees),
+		"GCCPUFraction": m.GCCPUFraction,
+		"GCSys":         float64(m.GCSys),
+		"HeapAlloc":     float64(m.HeapAlloc),
+		"HeapIdle":      float64(m.HeapIdle),
+		"HeapInuse":     float64(m.HeapInuse),
+		"HeapObjects":   float64(m.HeapObjects),
+		"HeapReleased":  float64(m.HeapReleased),
+		"HeapSys":       float64(m.HeapSys),
+		"LastGC":        float64(m.LastGC),
+		"Lookups":       float64(m.Lookups),
+		"MCacheInuse":   float64(m.MCacheInuse),
+		"MCacheSys":     float64(m.MCacheSys),
+		"MSpanInuse":    float64(m.MSpanInuse),
+		"MSpanSys":      float64(m.MSpanSys),
+		"Mallocs":       float64(m.Mallocs),
+		"NextGC":        float64(m.NextGC),
+		"NumForcedGC":   float64(m.NumForcedGC),
+		"NumGC":         float64(m.NumGC),
+		"OtherSys":      float64(m.OtherSys),
+		"PauseTotalNs":  float64(m.PauseTotalNs),
+		"StackInuse":    float64(m.StackInuse),
+		"StackSys":      float64(m.StackSys),
+		"Sys":           float64(m.Sys),
+		"TotalAlloc":    float64(m.TotalAlloc),
+		"RandomValue":   rand.Float64(),
+	}
 
-	gm.Alloc = float64(memStats.Alloc)
-	gm.BuckHashSys = float64(memStats.BuckHashSys)
-	gm.Frees = float64(memStats.Frees)
-	gm.GCCPUFraction = float64(memStats.GCCPUFraction)
-	gm.GCSys = float64(memStats.GCSys)
-	gm.HeapAlloc = float64(memStats.HeapAlloc)
-	gm.HeapIdle = float64(memStats.HeapIdle)
-	gm.HeapInuse = float64(memStats.HeapInuse)
-	gm.HeapObjects = float64(memStats.HeapObjects)
-	gm.HeapReleased = float64(memStats.HeapReleased)
-	gm.HeapSys = float64(memStats.HeapSys)
-	gm.LastGC = float64(memStats.LastGC)
-	gm.Lookups = float64(memStats.Lookups)
-	gm.MCacheInuse = float64(memStats.MCacheInuse)
-	gm.MCacheSys = float64(memStats.MCacheSys)
-	gm.MSpanInuse = float64(memStats.MSpanInuse)
-	gm.MSpanSys = float64(memStats.MSpanSys)
-	gm.Mallocs = float64(memStats.Mallocs)
-	gm.NextGC = float64(memStats.NextGC)
-	gm.NumForcedGC = float64(memStats.NumForcedGC)
-	gm.NumGC = float64(memStats.NumGC)
-	gm.OtherSys = float64(memStats.OtherSys)
-	gm.PauseTotalNs = float64(memStats.PauseTotalNs)
-	gm.StackInuse = float64(memStats.StackInuse)
-	gm.StackSys = float64(memStats.StackSys)
-	gm.Sys = float64(memStats.Sys)
-	gm.TotalAlloc = float64(memStats.TotalAlloc)
-	gm.RandomValue = rand.Float64()
-
-	cm.PollCount += 1
-}
-
-func parseFlags() {
-	flag.StringVar(&flagServerAddr, "a", "localhost:8080", "server address and port")
-	flag.Int64Var(&flagReportInterval, "r", 10, "report interval in seconds")
-	flag.Int64Var(&flagPollInterval, "p", 2, "poll interval in seconds")
-	flag.Parse()
+	mt.gauges = gauges
+	mt.pollCount++
 }
 
 func Run() {
-	var gm GaugeMonitor
-	var cm CounterMonitor
-	var memStats runtime.MemStats
-
 	parseFlags()
-
-	client := &http.Client{}
-
 	initConf()
+	mt := Monitor{}
 
 	pollTicker := time.NewTicker(time.Duration(pollInterval) * time.Second)
 	reportTicker := time.NewTicker(time.Duration(reportInterval) * time.Second)
 
+	slog.Info("Agent launched for sending metrics to", "address", serverAddr)
+
 	for {
 		select {
-		case pt := <-pollTicker.C:
-			msg := fmt.Sprintf("Poll metrics %v", pt)
-			slog.Info(msg)
-			pollMetrics(&gm, &cm, &memStats)
-		case rt := <-reportTicker.C:
-			msg := fmt.Sprintf("Send report %v", rt)
-			slog.Info(msg)
-			sendReport(client, gm, cm)
+		case <-pollTicker.C:
+			slog.Info("Poll metrics")
+			mt.pollMetrics()
+		case <-reportTicker.C:
+			slog.Info("Send report")
+			err := mt.processReport()
+			if err != nil {
+				panic(err)
+			}
 		}
 	}
 }
@@ -161,66 +116,68 @@ func initConf() {
 	}
 }
 
-func sendReport(client *http.Client, gm GaugeMonitor, cm CounterMonitor) {
-	gmv := reflect.ValueOf(&gm).Elem()
+func (mt *Monitor) processReport() error {
+	for id, value := range mt.gauges {
+		m := metric.Metrics{
+			ID:    id,
+			MType: metric.GaugeMetricType,
+			Value: &value,
+		}
 
-	for i := 0; i < gmv.NumField(); i++ {
-		name := gmv.Type().Field(i).Name
-		value := gmv.Field(i).Interface()
-		if cnvVal, ok := value.(float64); ok {
-			sendGaugeMetric(client, name, fmt.Sprintf("%.2f", cnvVal))
+		err := sendMetric(m)
+		if err != nil {
+			return err
 		}
 	}
 
-	sendCounterMetric(client, cm)
+	pollCount := metric.Metrics{
+		ID:    "PollCount",
+		MType: metric.CounterMetricType,
+		Delta: &mt.pollCount,
+	}
+
+	err := sendMetric(pollCount)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func sendGaugeMetric(client *http.Client, name string, value string) {
-	url := fmt.Sprintf("http://%s/%s/%s/%s/%s", serverAddr, updateMetricsURL, gaugeMetricType, name, value)
-
-	req, err := http.NewRequest("POST", url, nil)
-	if err != nil {
-		panic(err)
+func sendMetric(metric metric.Metrics) error {
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(metric); err != nil {
+		return err
 	}
-	req.Header.Add("Content-Type", "text/plain")
-
-	resp, err := client.Do(req)
+	compressed, err := compress.GZipCompress(buf.Bytes())
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	defer resp.Body.Close()
-	_, err = io.ReadAll(resp.Body)
+	client := resty.New()
+	resp, err := client.R().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Content-Encoding", "gzip").
+		SetHeader("Accept-Encoding", "gzip").
+		SetBody(compressed).
+		Post(sendMetricAddr())
+
 	if err != nil {
-		fmt.Printf("Error %s", err)
-		return
+		slog.Error("sending metric", "error", metric)
+	} else {
+		slog.Info("sending metric", "status code", resp.StatusCode)
+
+		if resp.StatusCode() != http.StatusOK {
+			slog.Error("sending metric", "invalid status code", resp.StatusCode)
+			slog.Error("sending metric", "body", string(resp.Body()))
+		}
 	}
 
-	msg := fmt.Sprintf("Sent gauge metric %s", url)
-	slog.Info(msg)
+	return nil
 }
 
-func sendCounterMetric(client *http.Client, cm CounterMonitor) {
-	url := fmt.Sprintf("http://%s/%s/%s/PollCount/%d", serverAddr, updateMetricsURL, counterMetricType, cm.PollCount)
+func sendMetricAddr() string {
+	addr := fmt.Sprintf("%s://%s/%s", proto, serverAddr, updateMetricsPath)
 
-	req, err := http.NewRequest("POST", url, nil)
-	if err != nil {
-		panic(err)
-	}
-	req.Header.Add("Content-Type", "text/plain")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-
-	defer resp.Body.Close()
-	_, err = io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Printf("Error %s", err)
-		return
-	}
-
-	msg := fmt.Sprintf("Sent counter metric %s", url)
-	slog.Info(msg)
+	return addr
 }

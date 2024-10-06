@@ -1,76 +1,46 @@
 package storage
 
-import (
-	"errors"
-	"slices"
-	"strconv"
-)
-
-const (
-	GaugeMetricType   = "gauge"
-	CounterMetricType = "counter"
-)
-
-var (
-	metricTypes = []string{GaugeMetricType, CounterMetricType}
-)
-
 type MemStorage struct {
-	Store map[string]map[string]string
+	gauges   map[string]float64
+	counters map[string]int64
 }
 
-func NewMemStorage(gaugeStore, counterStore map[string]string) (*MemStorage, error) {
-	store := map[string]map[string]string{
-		GaugeMetricType:   gaugeStore,
-		CounterMetricType: counterStore,
-	}
-
-	return &MemStorage{Store: store}, nil
-}
-
-func (m *MemStorage) Upsert(metricType, name, value string) error {
-	switch metricType {
-	case GaugeMetricType:
-		m.Store[metricType][name] = value
-	case CounterMetricType:
-		m.upsertCounterMetric(metricType, name, value)
-	}
-
-	return nil
-}
-
-func (m *MemStorage) upsertCounterMetric(metricType, name, value string) error {
-	if v, ok := m.Store[metricType][name]; ok {
-		currVal, err := strconv.Atoi(v)
-		if err != nil {
-			panic(err)
-		}
-		newVal, err := strconv.Atoi(value)
-		if err != nil {
-			panic(err)
-		}
-		updatedVal := currVal + newVal
-		res := strconv.Itoa(updatedVal)
-		m.Store[metricType][name] = res
-	} else {
-		m.Store[metricType][name] = value
-	}
-
-	return nil
-}
-
-func (m *MemStorage) Get(metricType, name string) (string, error) {
-	if !slices.Contains(metricTypes, metricType) {
-		return "", errors.New("invalid metric type")
-	}
-
-	if val, found := m.Store[metricType][name]; found {
-		return val, nil
-	} else {
-		return "", errors.New("not found metric")
+func NewMemStorage() *MemStorage {
+	return &MemStorage{
+		gauges:   make(map[string]float64),
+		counters: make(map[string]int64),
 	}
 }
 
-func (m *MemStorage) GetAllGauges() map[string]string {
-	return m.Store["gauge"]
+func (ms *MemStorage) UpdateGauge(id string, value float64) {
+	ms.gauges[id] = value
+}
+
+func (ms *MemStorage) UpdateCounter(id string, value int64) {
+	ms.counters[id] += value
+}
+
+func (ms *MemStorage) ReceiveGauge(id string) (float64, bool) {
+	val, ok := ms.gauges[id]
+	return val, ok
+}
+
+func (ms *MemStorage) ReceiveCounter(id string) (int64, bool) {
+	val, ok := ms.counters[id]
+	return val, ok
+}
+
+func (ms *MemStorage) ReceiveAllGauges() map[string]float64 {
+	return ms.gauges
+}
+
+func (ms *MemStorage) ReceiveAllCounters() map[string]int64 {
+	return ms.counters
+}
+
+func (ms *MemStorage) ReceiveAllMetrics() map[string]interface{} {
+	return map[string]interface{}{
+		"gauges":   ms.gauges,
+		"counters": ms.counters,
+	}
 }
