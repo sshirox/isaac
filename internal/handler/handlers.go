@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/go-chi/chi/v5"
@@ -9,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 type Repository interface {
@@ -237,5 +240,28 @@ func IndexHandler(repo Repository) http.HandlerFunc {
 		if err != nil {
 			panic(err)
 		}
+	}
+}
+
+func PingDBHandler(db *sql.DB) http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+
+		if err := db.PingContext(ctx); err != nil {
+			rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+			rw.WriteHeader(http.StatusInternalServerError)
+			rw.Write([]byte(err.Error()))
+
+			cancel()
+
+			return
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte("success ping"))
+
+		defer cancel()
 	}
 }

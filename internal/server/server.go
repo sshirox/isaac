@@ -1,8 +1,11 @@
 package server
 
 import (
+	"database/sql"
+	_ "database/sql"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/sshirox/isaac/internal/backup"
 	"github.com/sshirox/isaac/internal/handler"
 	"github.com/sshirox/isaac/internal/logger"
@@ -23,6 +26,12 @@ func Run() error {
 		return err
 	}
 
+	db, err := sql.Open("pgx", flagDatabaseDSN)
+	if err != nil {
+		slog.Error("open database", "error", err)
+	}
+	defer db.Close()
+
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Recoverer)
 	r.Use(logger.WithLogging)
@@ -38,6 +47,7 @@ func Run() error {
 		r.Post("/", handler.ValueByContentTypeHandler(s))
 		r.Get("/{type}/{name}", handler.ValueByContentTypeHandler(s))
 	})
+	r.Get("/ping", handler.PingDBHandler(db))
 
 	s, f, err := backup.RestoreMetrics(s, flagFileStoragePath, flagRestore)
 	if err != nil {
@@ -89,6 +99,10 @@ func initConf() error {
 	if err != nil {
 		slog.Error("parse restore", "error", err)
 		os.Exit(1)
+	}
+
+	if envDatabaseDSN := os.Getenv("DATABASE_DSN"); envDatabaseDSN != "" {
+		flagDatabaseDSN = envDatabaseDSN
 	}
 
 	if err = logger.Initialize(flagLogLevel); err != nil {
