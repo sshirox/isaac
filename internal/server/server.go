@@ -2,7 +2,6 @@ package server
 
 import (
 	"database/sql"
-	_ "database/sql"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	_ "github.com/jackc/pgx/v5/stdlib"
