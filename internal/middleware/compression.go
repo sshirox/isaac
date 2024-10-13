@@ -79,7 +79,7 @@ func GZipMiddleware(h http.Handler) http.Handler {
 			defer func(cw *compressWriter) {
 				err := cw.Close()
 				if err != nil {
-					slog.Error("close compress writer", "error", err)
+					slog.Error("close compress writer", "err", err)
 				}
 			}(cw)
 		}
@@ -96,7 +96,7 @@ func GZipMiddleware(h http.Handler) http.Handler {
 			defer func(cr *CompressReader) {
 				err = cr.Close()
 				if err != nil {
-					slog.Error("close compress reader", "error", err)
+					slog.Error("close compress reader", "err", err)
 				}
 			}(cr)
 		}

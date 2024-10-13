@@ -1,20 +1,29 @@
 package server
 
 import (
-	"database/sql"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/sshirox/isaac/internal/backup"
+	"github.com/sshirox/isaac/internal/database"
 	"github.com/sshirox/isaac/internal/handler"
 	"github.com/sshirox/isaac/internal/logger"
 	"github.com/sshirox/isaac/internal/middleware"
 	"github.com/sshirox/isaac/internal/storage"
-	"go.uber.org/zap"
 	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
+)
+
+const (
+	dbStorageSource     = "database"
+	fileStorageSource   = "file"
+	memoryStorageSource = "memory"
+	dbDriver            = "postgres"
+)
+
+var (
+	storageSource string
 )
 
 func Run() error {
@@ -25,11 +34,18 @@ func Run() error {
 		return err
 	}
 
-	db, err := sql.Open("pgx", flagDatabaseDSN)
+	db, err := database.Open(dbDriver, flagDatabaseDSN)
 	if err != nil {
-		slog.Error("open database", "error", err)
+		slog.Error("open database", "err", err)
 	}
 	defer db.Close()
+
+	err = database.Ping(db)
+	if err != nil {
+		slog.Error("ping database", "err", err)
+	} else {
+		slog.Info("open database", "addr", flagDatabaseDSN)
+	}
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Recoverer)
@@ -48,15 +64,40 @@ func Run() error {
 	})
 	r.Get("/ping", handler.PingDBHandler(db))
 
-	s, f, err := backup.RestoreMetrics(s, flagFileStoragePath, flagRestore)
-	if err != nil {
-		return err
+	switch storageSource {
+	case fileStorageSource:
+		ms, f, err := backup.RestoreMetrics(s, flagFileStoragePath, flagRestore)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		slog.Info("File storage source")
+
+		go backup.RunWorker(ms, flagStoreInterval, f, make(chan struct{}))
+	case dbStorageSource:
+		err = database.CreateSchema(db)
+		if err != nil {
+			slog.Error("create schema", "err", err)
+			return err
+		}
+
+		err = database.CreateTable(db)
+		if err != nil {
+			slog.Error("create table", "err", err)
+			return err
+		}
+
+		err = database.ReadMetrics(db, s)
+		if err != nil {
+			return err
+		}
+		slog.Info("DB storage source")
+
+		go database.RunSaver(db, s, flagStoreInterval, make(chan struct{}))
 	}
-	defer f.Close()
 
-	go backup.RunWorker(s, flagStoreInterval, f, make(chan struct{}))
-
-	logger.Log.Info("Running server", zap.String("address", flagRunAddr))
+	slog.Info("Running server", "address", flagRunAddr)
 
 	err = http.ListenAndServe(flagRunAddr, r)
 
@@ -80,7 +121,7 @@ func initConf() error {
 	if envStoreInterval != "" {
 		storeInterval, err := strconv.ParseInt(envStoreInterval, 10, 64)
 		if err != nil {
-			slog.Error("parse store interval", "error", err)
+			slog.Error("parse store interval", "err", err)
 		}
 		flagStoreInterval = storeInterval
 	}
@@ -96,12 +137,20 @@ func initConf() error {
 	var err error
 	flagRestore, err = strconv.ParseBool(flagRestoreStr)
 	if err != nil {
-		slog.Error("parse restore", "error", err)
+		slog.Error("parse restore", "err", err)
 		os.Exit(1)
 	}
 
 	if envDatabaseDSN := os.Getenv("DATABASE_DSN"); envDatabaseDSN != "" {
 		flagDatabaseDSN = envDatabaseDSN
+	}
+
+	if flagDatabaseDSN != "" {
+		storageSource = dbStorageSource
+	} else if flagFileStoragePath != "" {
+		storageSource = fileStorageSource
+	} else {
+		storageSource = memoryStorageSource
 	}
 
 	if err = logger.Initialize(flagLogLevel); err != nil {

@@ -248,9 +248,9 @@ func PingDBHandler(db *sql.DB) http.HandlerFunc {
 		rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
 
 		if err := db.PingContext(ctx); err != nil {
-			rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 			rw.WriteHeader(http.StatusInternalServerError)
 			rw.Write([]byte(err.Error()))
 
@@ -261,7 +261,5 @@ func PingDBHandler(db *sql.DB) http.HandlerFunc {
 
 		rw.WriteHeader(http.StatusOK)
 		rw.Write([]byte("success ping"))
-
-		defer cancel()
 	}
 }
