@@ -11,6 +11,7 @@ var (
 	flagFileStoragePath string
 	flagRestoreStr      string
 	flagRestore         bool
+	flagDatabaseDSN     string
 )
 
 func parseFlags() {
@@ -19,6 +20,7 @@ func parseFlags() {
 	flag.Int64Var(&flagStoreInterval, "i", 300, "store interval")
 	flag.StringVar(&flagFileStoragePath, "f", "./backups", "file storage path")
 	flag.StringVar(&flagRestoreStr, "r", "true", "restore")
+	flag.StringVar(&flagDatabaseDSN, "d", "", "database DSN")
 
 	flag.Parse()
 }

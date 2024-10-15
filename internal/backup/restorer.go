@@ -28,21 +28,21 @@ func RestoreMetrics(
 	var f *os.File
 
 	if err = os.MkdirAll(storagePath, 0755); err != nil {
-		slog.Error("create backup dir", "error", err)
+		slog.Error("create backup dir", "err", err)
 		return nil, nil, err
 	}
 
 	fp := path.Join(storagePath, "metrics.bk")
 	f, err = os.OpenFile(fp, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		slog.Error("open file", "error", err)
+		slog.Error("open file", "err", err)
 		return nil, nil, err
 	}
 
 	if enable {
 		err = restore(ms, f)
 		if err != nil {
-			slog.Error("restore metrics", "error", err)
+			slog.Error("restore metrics", "err", err)
 			return nil, nil, err
 		}
 	}

@@ -163,7 +163,7 @@ func sendMetric(metric metric.Metrics) error {
 		Post(sendMetricAddr())
 
 	if err != nil {
-		slog.Error("sending metric", "error", metric)
+		slog.Error("sending metric", "err", metric)
 	} else {
 		slog.Info("sending metric", "status code", resp.StatusCode)
 
