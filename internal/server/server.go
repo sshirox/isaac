@@ -59,6 +59,9 @@ func Run() error {
 		r.Post("/", handler.UpdateByContentTypeHandler(s))
 		r.Post("/{type}/{name}/{value}", handler.UpdateMetricsHandler(s))
 	})
+	r.Route("/updates", func(r chi.Router) {
+		r.Post("/", handler.BulkUpdateHandler(s))
+	})
 	r.Route("/value", func(r chi.Router) {
 		r.Post("/", handler.ValueByContentTypeHandler(s))
 		r.Get("/{type}/{name}", handler.ValueByContentTypeHandler(s))

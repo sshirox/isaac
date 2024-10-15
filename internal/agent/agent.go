@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	proto             = "http"
-	updateMetricsPath = "update"
+	proto                 = "http"
+	updateMetricsPath     = "update"
+	bulkUpdateMetricsPath = "updates"
 )
 
 type Monitor struct {
@@ -73,18 +74,18 @@ func Run() {
 	pollTicker := time.NewTicker(time.Duration(pollInterval) * time.Second)
 	reportTicker := time.NewTicker(time.Duration(reportInterval) * time.Second)
 
-	slog.Info("Agent launched for sending metrics to", "address", serverAddr)
+	slog.Info("[Run] Agent launched for sending metrics to", "address", serverAddr)
 
 	for {
 		select {
 		case <-pollTicker.C:
-			slog.Info("Poll metrics")
+			slog.Info("[Run] Poll metrics")
 			mt.pollMetrics()
 		case <-reportTicker.C:
-			slog.Info("Send report")
-			err := mt.processReport()
+			slog.Info("[Run] Send report")
+			err := mt.bulkSendMetrics()
 			if err != nil {
-				panic(err)
+				slog.Error("[Run] bulk sending metrics", "error", err)
 			}
 		}
 	}
@@ -176,8 +177,71 @@ func sendMetric(metric metric.Metrics) error {
 	return nil
 }
 
+func (mt *Monitor) bulkSendMetrics() error {
+	slog.Info("[Bulk_Send_Metrics] Start sending metrics")
+
+	var metrics []metric.Metrics
+	var err error
+
+	for id, val := range mt.gauges {
+		m := metric.Metrics{
+			ID:    id,
+			MType: metric.GaugeMetricType,
+			Value: &val,
+		}
+		metrics = append(metrics, m)
+	}
+
+	pc := metric.Metrics{
+		ID:    "PollCount",
+		MType: metric.CounterMetricType,
+		Delta: &mt.pollCount,
+	}
+	metrics = append(metrics, pc)
+
+	slog.Info("[Bulk_Send_Metrics] metrics", "set", metrics)
+
+	var buf bytes.Buffer
+	if err = json.NewEncoder(&buf).Encode(metrics); err != nil {
+		slog.Error("[Bulk_Send_Metrics] encode metrics", "err", err)
+		return err
+	}
+	compressedData, err := compress.GZipCompress(buf.Bytes())
+	if err != nil {
+		slog.Error("[Bulk_Send_Metrics] compress metrics", "err", err)
+		return err
+	}
+
+	client := resty.New()
+	resp, err := client.R().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Content-Encoding", "gzip").
+		SetHeader("Accept-Encoding", "gzip").
+		SetBody(compressedData).
+		Post(bulkSendMetricsAddr())
+
+	if err != nil {
+		slog.Error("[Bulk_Send_Metrics] sending metrics", "err", err)
+	} else {
+		slog.Info("[Bulk_Send_Metrics] sending metrics", "status code", resp.StatusCode)
+
+		if resp.StatusCode() != http.StatusOK {
+			slog.Error("[Bulk_Send_Metrics] sending metrics", "invalid status code", resp.StatusCode)
+			slog.Error("[Bulk_Send_Metrics] sending metrics", "body", string(resp.Body()))
+		}
+	}
+
+	return nil
+}
+
 func sendMetricAddr() string {
 	addr := fmt.Sprintf("%s://%s/%s", proto, serverAddr, updateMetricsPath)
+
+	return addr
+}
+
+func bulkSendMetricsAddr() string {
+	addr := fmt.Sprintf("%s://%s/%s", proto, serverAddr, bulkUpdateMetricsPath)
 
 	return addr
 }
