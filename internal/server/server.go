@@ -1,14 +1,15 @@
 package server
 
 import (
+	"context"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/sshirox/isaac/internal/backup"
-	"github.com/sshirox/isaac/internal/database"
 	"github.com/sshirox/isaac/internal/handler"
 	"github.com/sshirox/isaac/internal/logger"
 	"github.com/sshirox/isaac/internal/middleware"
 	"github.com/sshirox/isaac/internal/storage"
+	"github.com/sshirox/isaac/internal/storage/pg"
 	"log/slog"
 	"net/http"
 	"os"
@@ -34,13 +35,13 @@ func Run() error {
 		return err
 	}
 
-	db, err := database.Open(dbDriver, flagDatabaseDSN)
+	db, err := pg.Open(dbDriver, flagDatabaseDSN)
 	if err != nil {
 		slog.Error("open database", "err", err)
 	}
 	defer db.Close()
 
-	err = database.Ping(db)
+	err = pg.Ping(db)
 	if err != nil {
 		slog.Error("ping database", "err", err)
 	} else {
@@ -72,29 +73,25 @@ func Run() error {
 		}
 		defer f.Close()
 
-		slog.Info("File storage source")
+		slog.Info("File is used as storage")
 
 		go backup.RunWorker(ms, flagStoreInterval, f, make(chan struct{}))
 	case dbStorageSource:
-		err = database.CreateSchema(db)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		err = pg.Bootstrap(db, ctx)
 		if err != nil {
-			slog.Error("create schema", "err", err)
+			slog.Error("bootstrap database", "err", err)
 			return err
 		}
 
-		err = database.CreateTable(db)
-		if err != nil {
-			slog.Error("create table", "err", err)
-			return err
-		}
-
-		err = database.ReadMetrics(db, s)
+		err = pg.ListMetrics(db, s)
 		if err != nil {
 			return err
 		}
-		slog.Info("DB storage source")
+		slog.Info("Database is used as a storage")
 
-		go database.RunSaver(db, s, flagStoreInterval, make(chan struct{}))
+		go pg.RunSaver(db, s, flagStoreInterval, make(chan struct{}))
 	}
 
 	slog.Info("Running server", "address", flagRunAddr)

@@ -1,4 +1,4 @@
-package database
+package pg
 
 import (
 	"context"
@@ -32,33 +32,27 @@ func Ping(db *sql.DB) error {
 	return nil
 }
 
-func CreateSchema(db *sql.DB) error {
-	query := "CREATE SCHEMA IF NOT EXISTS observability"
-	_, err := db.Exec(query)
-
+func Bootstrap(db *sql.DB, ctx context.Context) error {
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 
-	return nil
-}
+	defer tx.Rollback()
 
-func CreateTable(db *sql.DB) error {
-	query := `
+	tx.ExecContext(ctx, `CREATE SCHEMA IF NOT EXISTS observability`)
+
+	tx.ExecContext(ctx, `
         CREATE TABLE IF NOT EXISTS observability.metrics (
             id SERIAL PRIMARY KEY,
             type character varying(255) NOT NULL,
             name character varying(255) NOT NULL UNIQUE,
             value double precision,
             delta int
-        )`
-	_, err := db.Exec(query)
+        )
+    `)
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return tx.Commit()
 }
 
 func RunSaver(db *sql.DB, ms *storage.MemStorage, interval int64, stopChan chan struct{}) {
@@ -112,13 +106,13 @@ func upsertMetrics(db *sql.DB, s *storage.MemStorage) error {
 	return nil
 }
 
-func ReadMetrics(db *sql.DB, ms *storage.MemStorage) error {
-	err := readGauges(db, ms)
+func ListMetrics(db *sql.DB, ms *storage.MemStorage) error {
+	err := listGauges(db, ms)
 	if err != nil {
 		return errors.Wrap(err, "read metrics")
 	}
 
-	err = readCounters(db, ms)
+	err = listCounters(db, ms)
 	if err != nil {
 		return errors.Wrap(err, "read metrics")
 	}
@@ -126,7 +120,7 @@ func ReadMetrics(db *sql.DB, ms *storage.MemStorage) error {
 	return nil
 }
 
-func readGauges(db *sql.DB, ms *storage.MemStorage) error {
+func listGauges(db *sql.DB, ms *storage.MemStorage) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -159,7 +153,7 @@ func readGauges(db *sql.DB, ms *storage.MemStorage) error {
 	return nil
 }
 
-func readCounters(db *sql.DB, ms *storage.MemStorage) error {
+func listCounters(db *sql.DB, ms *storage.MemStorage) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
