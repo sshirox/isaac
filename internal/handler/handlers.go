@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/go-chi/chi/v5"
@@ -9,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 type Repository interface {
@@ -165,6 +168,54 @@ func UpdateByContentTypeHandler(repo Repository) http.HandlerFunc {
 	}
 }
 
+func BulkUpdateHandler(repo Repository) http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		rw.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte("invalid body"))
+			return
+		}
+		var metrics []metric.Metrics
+		err = json.Unmarshal(body, &metrics)
+		if err != nil {
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte("invalid json body"))
+			return
+		}
+
+		for _, m := range metrics {
+			switch m.MType {
+			case metric.GaugeMetricType:
+				id, value := m.ID, m.Value
+				if value == nil {
+					rw.WriteHeader(http.StatusBadRequest)
+					rw.Write([]byte("empty value"))
+					return
+				}
+				repo.UpdateGauge(id, *value)
+			case metric.CounterMetricType:
+				id, delta := m.ID, m.Delta
+				if delta == nil {
+					rw.WriteHeader(http.StatusBadRequest)
+					rw.Write([]byte("empty delta"))
+					return
+				}
+				repo.UpdateCounter(id, *delta)
+			default:
+				rw.WriteHeader(http.StatusBadRequest)
+				rw.Write([]byte("invalid metric type"))
+				return
+			}
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(metrics)
+	}
+}
+
 func ValueByContentTypeHandler(repo Repository) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		contentType := r.Header.Get("Content-type")
@@ -237,5 +288,26 @@ func IndexHandler(repo Repository) http.HandlerFunc {
 		if err != nil {
 			panic(err)
 		}
+	}
+}
+
+func PingDBHandler(db *sql.DB) http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+
+		if err := db.PingContext(ctx); err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+			rw.Write([]byte(err.Error()))
+
+			cancel()
+
+			return
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte("success ping"))
 	}
 }
