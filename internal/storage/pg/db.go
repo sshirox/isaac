@@ -83,7 +83,7 @@ func upsertMetrics(db *sql.DB, s *storage.MemStorage) error {
                 VALUES ($1, $2, $3)
                 ON CONFLICT (name)
                 DO UPDATE SET name = $1, type = $2, value = $3`
-		_, err := db.ExecContext(ctx, query, name, metric.GaugeMetricType, value)
+		err := ExecuteContextWithRetry(ctx, db, query, name, metric.GaugeMetricType, value)
 		if err != nil {
 			slog.Error("upsert gauge", "err", err)
 			return errors.Wrap(err, "upsert gauge")
@@ -96,7 +96,7 @@ func upsertMetrics(db *sql.DB, s *storage.MemStorage) error {
                 VALUES ($1, $2, $3)
                 ON CONFLICT (name)
                 DO UPDATE SET name = $1, type = $2, delta = $3`
-		_, err := db.ExecContext(ctx, query, name, metric.CounterMetricType, delta)
+		err := ExecuteContextWithRetry(ctx, db, query, name, metric.CounterMetricType, delta)
 		if err != nil {
 			slog.Error("upsert counter", "err", err)
 			return errors.Wrap(err, "upsert counter")
@@ -128,7 +128,7 @@ func listGauges(db *sql.DB, ms *storage.MemStorage) error {
 	var value float64
 
 	query := "SELECT name, value FROM observability.metrics WHERE type = 'gauge'"
-	rows, err := db.QueryContext(ctx, query)
+	rows, err := QueryContextWithRetry(ctx, db, query)
 	if err != nil {
 		slog.Error("read gauge", "err", err)
 		return errors.Wrap(err, "read gauge")
@@ -161,7 +161,7 @@ func listCounters(db *sql.DB, ms *storage.MemStorage) error {
 	var delta int64
 
 	query := "SELECT name, delta FROM observability.metrics WHERE type = 'counter'"
-	rows, err := db.QueryContext(ctx, query)
+	rows, err := QueryContextWithRetry(ctx, db, query)
 	if err != nil {
 		slog.Error("read counter", "err", err)
 		return errors.Wrap(err, "read counter")
