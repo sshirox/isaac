@@ -18,7 +18,7 @@ func RunWorker(
 		select {
 		case <-t.C:
 			if err := SaveBackup(ms, f); err != nil {
-				slog.Error("backup metrics", "error", err)
+				slog.Error("backup metrics", "err", err)
 			}
 		case <-sc:
 			slog.Info("stop backup worker")

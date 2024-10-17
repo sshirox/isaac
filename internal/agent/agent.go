@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"github.com/go-resty/resty/v2"
 	"github.com/sshirox/isaac/internal/compress"
+	errs "github.com/sshirox/isaac/internal/errors"
 	"github.com/sshirox/isaac/internal/metric"
+	"github.com/sshirox/isaac/internal/retries"
 	"log/slog"
 	"math/rand"
 	"net/http"
@@ -17,8 +19,9 @@ import (
 )
 
 const (
-	proto             = "http"
-	updateMetricsPath = "update"
+	proto                 = "http"
+	updateMetricsPath     = "update"
+	bulkUpdateMetricsPath = "updates"
 )
 
 type Monitor struct {
@@ -73,18 +76,18 @@ func Run() {
 	pollTicker := time.NewTicker(time.Duration(pollInterval) * time.Second)
 	reportTicker := time.NewTicker(time.Duration(reportInterval) * time.Second)
 
-	slog.Info("Agent launched for sending metrics to", "address", serverAddr)
+	slog.Info("[Run] Agent launched for sending metrics to", "address", serverAddr)
 
 	for {
 		select {
 		case <-pollTicker.C:
-			slog.Info("Poll metrics")
+			slog.Info("[Run] Poll metrics")
 			mt.pollMetrics()
 		case <-reportTicker.C:
-			slog.Info("Send report")
-			err := mt.processReport()
+			slog.Info("[Run] Send report")
+			err := mt.bulkSendMetrics()
 			if err != nil {
-				panic(err)
+				slog.Error("[Run] bulk sending metrics", "error", err)
 			}
 		}
 	}
@@ -155,22 +158,107 @@ func sendMetric(metric metric.Metrics) error {
 	}
 
 	client := resty.New()
-	resp, err := client.R().
-		SetHeader("Content-Type", "application/json").
-		SetHeader("Content-Encoding", "gzip").
-		SetHeader("Accept-Encoding", "gzip").
-		SetBody(compressed).
-		Post(sendMetricAddr())
+	err = retries.Retry(func() error {
+		resp, respErr := client.R().
+			SetHeader("Content-Type", "application/json").
+			SetHeader("Content-Encoding", "gzip").
+			SetHeader("Accept-Encoding", "gzip").
+			SetBody(compressed).
+			Post(sendMetricAddr())
+
+		if respErr != nil {
+			slog.Error("send request", "err", respErr)
+			return errs.ErrConnection
+		}
+
+		statusCode := resp.StatusCode()
+
+		if statusCode >= http.StatusInternalServerError && statusCode <= http.StatusGatewayTimeout {
+			slog.Error("got retry status", "code", statusCode)
+			return errs.ErrServer
+		}
+
+		if statusCode != http.StatusOK {
+			slog.Error("got non retry status", "code", statusCode)
+			return errs.ErrNonRetry
+		}
+
+		return nil
+	})
 
 	if err != nil {
-		slog.Error("sending metric", "error", metric)
-	} else {
-		slog.Info("sending metric", "status code", resp.StatusCode)
+		slog.Error("sending metric", "err", metric)
+	}
 
-		if resp.StatusCode() != http.StatusOK {
-			slog.Error("sending metric", "invalid status code", resp.StatusCode)
-			slog.Error("sending metric", "body", string(resp.Body()))
+	return nil
+}
+
+func (mt *Monitor) bulkSendMetrics() error {
+	slog.Info("[Bulk_Send_Metrics] Start sending metrics")
+
+	var metrics []metric.Metrics
+	var err error
+
+	for id, val := range mt.gauges {
+		m := metric.Metrics{
+			ID:    id,
+			MType: metric.GaugeMetricType,
+			Value: &val,
 		}
+		metrics = append(metrics, m)
+	}
+
+	pc := metric.Metrics{
+		ID:    "PollCount",
+		MType: metric.CounterMetricType,
+		Delta: &mt.pollCount,
+	}
+	metrics = append(metrics, pc)
+
+	slog.Info("[Bulk_Send_Metrics] metrics", "set", metrics)
+
+	var buf bytes.Buffer
+	if err = json.NewEncoder(&buf).Encode(metrics); err != nil {
+		slog.Error("[Bulk_Send_Metrics] encode metrics", "err", err)
+		return err
+	}
+	compressedData, err := compress.GZipCompress(buf.Bytes())
+	if err != nil {
+		slog.Error("[Bulk_Send_Metrics] compress metrics", "err", err)
+		return err
+	}
+
+	client := resty.New()
+	err = retries.Retry(func() error {
+		resp, respErr := client.R().
+			SetHeader("Content-Type", "application/json").
+			SetHeader("Content-Encoding", "gzip").
+			SetHeader("Accept-Encoding", "gzip").
+			SetBody(compressedData).
+			Post(bulkSendMetricsAddr())
+
+		if respErr != nil {
+			slog.Error("send request", "err", respErr)
+			return errs.ErrConnection
+		}
+
+		statusCode := resp.StatusCode()
+
+		if statusCode >= http.StatusInternalServerError && statusCode <= http.StatusGatewayTimeout {
+			slog.Error("got retry status", "code", statusCode)
+			return errs.ErrServer
+		}
+
+		if statusCode != http.StatusOK {
+			slog.Error("got non retry status", "code", statusCode)
+			return errs.ErrNonRetry
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		slog.Error("[Bulk_Send_Metrics] sending metrics", "err", err)
 	}
 
 	return nil
@@ -178,6 +266,12 @@ func sendMetric(metric metric.Metrics) error {
 
 func sendMetricAddr() string {
 	addr := fmt.Sprintf("%s://%s/%s", proto, serverAddr, updateMetricsPath)
+
+	return addr
+}
+
+func bulkSendMetricsAddr() string {
+	addr := fmt.Sprintf("%s://%s/%s", proto, serverAddr, bulkUpdateMetricsPath)
 
 	return addr
 }
