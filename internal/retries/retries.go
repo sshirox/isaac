@@ -13,7 +13,7 @@ func Retry(op func() error) error {
 		if err == nil {
 			return nil
 		}
-		if errors.Is(err, errs.NonRetryErr) {
+		if errors.Is(err, errs.ErrNonRetry) {
 			return err
 		}
 		time.Sleep(interval)

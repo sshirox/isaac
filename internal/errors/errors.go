@@ -8,11 +8,11 @@ import (
 )
 
 var (
-	ConnectionErr = errors.New("connection error")
-	NonRetryErr   = errors.New("non retry error")
-	NonRetryPGErr = errors.New("non retry postgres error")
-	RetryPGErr    = errors.New("retry postgres error")
-	ServerErr     = errors.New("server error")
+	ErrConnection = errors.New("connection error")
+	ErrNonRetry   = errors.New("non retry error")
+	ErrNonRetryPG = errors.New("non retry postgres error")
+	ErrRetryPG    = errors.New("retry postgres error")
+	ErrServer     = errors.New("server error")
 )
 
 var (

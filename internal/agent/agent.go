@@ -164,23 +164,23 @@ func sendMetric(metric metric.Metrics) error {
 			SetHeader("Content-Encoding", "gzip").
 			SetHeader("Accept-Encoding", "gzip").
 			SetBody(compressed).
-			Post(bulkSendMetricsAddr())
+			Post(sendMetricAddr())
 
 		if respErr != nil {
 			slog.Error("send request", "err", respErr)
-			return errs.ConnectionErr
+			return errs.ErrConnection
 		}
 
 		statusCode := resp.StatusCode()
 
 		if statusCode >= http.StatusInternalServerError && statusCode <= http.StatusGatewayTimeout {
 			slog.Error("got retry status", "code", statusCode)
-			return errs.ServerErr
+			return errs.ErrServer
 		}
 
 		if statusCode != http.StatusOK {
 			slog.Error("got non retry status", "code", statusCode)
-			return errs.NonRetryErr
+			return errs.ErrNonRetry
 		}
 
 		return nil
@@ -239,19 +239,19 @@ func (mt *Monitor) bulkSendMetrics() error {
 
 		if respErr != nil {
 			slog.Error("send request", "err", respErr)
-			return errs.ConnectionErr
+			return errs.ErrConnection
 		}
 
 		statusCode := resp.StatusCode()
 
 		if statusCode >= http.StatusInternalServerError && statusCode <= http.StatusGatewayTimeout {
 			slog.Error("got retry status", "code", statusCode)
-			return errs.ServerErr
+			return errs.ErrServer
 		}
 
 		if statusCode != http.StatusOK {
 			slog.Error("got non retry status", "code", statusCode)
-			return errs.NonRetryErr
+			return errs.ErrNonRetry
 		}
 
 		return nil

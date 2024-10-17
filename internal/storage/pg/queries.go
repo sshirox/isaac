@@ -19,12 +19,12 @@ func ExecuteContextWithRetry(ctx context.Context, exec ExecContext, qry string, 
 			if errs.IsRetryPGErr(execErr) {
 				slog.ErrorContext(ctx, "postgres retry error", "err", execErr)
 
-				return errs.RetryPGErr
+				return errs.ErrRetryPG
 			}
 
 			slog.ErrorContext(ctx, "postgres non retry error", "err", execErr)
 
-			return errs.NonRetryPGErr
+			return errs.ErrNonRetryPG
 		}
 
 		return nil
@@ -49,17 +49,17 @@ func QueryContextWithRetry(ctx context.Context, db *sql.DB, qry string, args ...
 			if errs.IsRetryPGErr(err) {
 				slog.ErrorContext(ctx, "postgres retry error", "err", err)
 
-				return errs.RetryPGErr
+				return errs.ErrRetryPG
 			}
 			slog.ErrorContext(ctx, "postgres non retry error", "err", err)
 
-			return errs.NonRetryPGErr
+			return errs.ErrNonRetryPG
 		}
 
 		if rows.Err() != nil {
 			slog.ErrorContext(ctx, "select rows", "err", rows.Err())
 
-			return errs.NonRetryErr
+			return errs.ErrNonRetry
 		}
 
 		return nil
