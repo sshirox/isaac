@@ -27,7 +27,7 @@ func (s *SignValidator) Validate(next http.Handler) http.Handler {
 
 		sign := r.Header.Get("HashSHA256")
 		if len(sign) == 0 {
-			slog.Error("validate signature", "empty 'HashSHA256' header")
+			slog.Info("validate signature", "empty 'HashSHA256' header")
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
 		}
@@ -46,7 +46,7 @@ func (s *SignValidator) Validate(next http.Handler) http.Handler {
 
 		isValid, respSign := s.encoder.Validate(buf.Bytes(), sign)
 		if !isValid {
-			slog.Error("validate signature", "not valid")
+			slog.Info("validate signature", "not valid")
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
 		}
