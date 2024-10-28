@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/go-resty/resty/v2"
 	"github.com/sshirox/isaac/internal/compress"
+	"github.com/sshirox/isaac/internal/crypto"
 	errs "github.com/sshirox/isaac/internal/errors"
 	"github.com/sshirox/isaac/internal/metric"
 	"github.com/sshirox/isaac/internal/retries"
@@ -27,6 +28,8 @@ const (
 type Monitor struct {
 	gauges    map[string]float64
 	pollCount int64
+	client    *resty.Client
+	encoder   *crypto.Encoder
 }
 
 func (mt *Monitor) pollMetrics() {
@@ -71,7 +74,11 @@ func (mt *Monitor) pollMetrics() {
 func Run() {
 	parseFlags()
 	initConf()
-	mt := Monitor{}
+	encoder := crypto.NewEncoder(flagEncryptionKey)
+	mt := Monitor{
+		encoder: encoder,
+		client:  resty.New(),
+	}
 
 	pollTicker := time.NewTicker(time.Duration(pollInterval) * time.Second)
 	reportTicker := time.NewTicker(time.Duration(reportInterval) * time.Second)
@@ -116,6 +123,10 @@ func initConf() {
 		pollInterval = int64(i)
 	} else {
 		pollInterval = flagPollInterval
+	}
+
+	if envEncryptionKey := os.Getenv("KEY"); envEncryptionKey != "" {
+		flagEncryptionKey = envEncryptionKey
 	}
 }
 
@@ -228,14 +239,18 @@ func (mt *Monitor) bulkSendMetrics() error {
 		return err
 	}
 
-	client := resty.New()
 	err = retries.Retry(func() error {
-		resp, respErr := client.R().
+		req := mt.client.R().
 			SetHeader("Content-Type", "application/json").
 			SetHeader("Content-Encoding", "gzip").
 			SetHeader("Accept-Encoding", "gzip").
-			SetBody(compressedData).
-			Post(bulkSendMetricsAddr())
+			SetBody(compressedData)
+
+		if mt.encoder.IsEnabled() {
+			req = req.SetHeader("HashSHA256", mt.encoder.Encode(buf.Bytes()))
+		}
+
+		resp, respErr := req.Post(bulkSendMetricsAddr())
 
 		if respErr != nil {
 			slog.Error("send request", "err", respErr)

@@ -5,6 +5,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/sshirox/isaac/internal/backup"
+	"github.com/sshirox/isaac/internal/crypto"
 	"github.com/sshirox/isaac/internal/handler"
 	"github.com/sshirox/isaac/internal/logger"
 	"github.com/sshirox/isaac/internal/middleware"
@@ -47,6 +48,8 @@ func Run() error {
 	} else {
 		slog.Info("open database", "addr", flagDatabaseDSN)
 	}
+	encoder := crypto.NewEncoder(flagEncryptionKey)
+	signValidator := middleware.NewSignValidator(encoder).Validate
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Recoverer)
@@ -60,7 +63,7 @@ func Run() error {
 		r.Post("/{type}/{name}/{value}", handler.UpdateMetricsHandler(s))
 	})
 	r.Route("/updates", func(r chi.Router) {
-		r.Post("/", handler.BulkUpdateHandler(s))
+		r.With(signValidator).Post("/", handler.BulkUpdateHandler(s))
 	})
 	r.Route("/value", func(r chi.Router) {
 		r.Post("/", handler.ValueByContentTypeHandler(s))
@@ -143,6 +146,10 @@ func initConf() error {
 
 	if envDatabaseDSN := os.Getenv("DATABASE_DSN"); envDatabaseDSN != "" {
 		flagDatabaseDSN = envDatabaseDSN
+	}
+
+	if envEncryptionKey := os.Getenv("KEY"); envEncryptionKey != "" {
+		flagEncryptionKey = envEncryptionKey
 	}
 
 	if flagDatabaseDSN != "" {
