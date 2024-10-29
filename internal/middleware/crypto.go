@@ -25,10 +25,10 @@ func (s *SignValidator) Validate(next http.Handler) http.Handler {
 			return
 		}
 
-		sign := r.Header.Get("HashSHA256")
+		sign := r.Header.Get(crypto.SignHeader)
 		if len(sign) == 0 {
 			slog.Info("signature required")
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
@@ -36,7 +36,7 @@ func (s *SignValidator) Validate(next http.Handler) http.Handler {
 		_, err := buf.ReadFrom(r.Body)
 		if err != nil {
 			slog.Error("read request body", "err", err)
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		_ = r.Body.Close()
@@ -47,12 +47,12 @@ func (s *SignValidator) Validate(next http.Handler) http.Handler {
 		isValid, respSign := s.encoder.Validate(buf.Bytes(), sign)
 		if !isValid {
 			slog.Info("signature is invalid")
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
 		next.ServeHTTP(w, r)
 
-		w.Header().Set("HashSHA256", respSign)
+		w.Header().Set(crypto.SignHeader, respSign)
 	})
 }

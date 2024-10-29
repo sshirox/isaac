@@ -6,6 +6,10 @@ import (
 	"encoding/hex"
 )
 
+const (
+	SignHeader = "HashSHA256"
+)
+
 type Encoder struct {
 	key       []byte
 	isEnabled bool
@@ -26,19 +30,19 @@ func (e Encoder) Encode(data []byte) string {
 	return hex.EncodeToString(e.sign(data))
 }
 
-func (e Encoder) Validate(data []byte, signature string) (bool, string) {
+func (e Encoder) Validate(data []byte, sign string) (bool, string) {
 	if !e.isEnabled {
 		return false, ""
 	}
 
-	sign, err := hex.DecodeString(signature)
+	s, err := hex.DecodeString(sign)
 	if err != nil {
 		return false, ""
 	}
 
 	signedData := e.sign(data)
 
-	return hmac.Equal(signedData, sign), hex.EncodeToString(signedData)
+	return hmac.Equal(signedData, s), hex.EncodeToString(signedData)
 }
 
 func (e Encoder) IsEnabled() bool {
@@ -46,8 +50,8 @@ func (e Encoder) IsEnabled() bool {
 }
 
 func (e Encoder) sign(data []byte) []byte {
-	h := hmac.New(sha256.New, e.key)
-	h.Write(data)
+	hash := hmac.New(sha256.New, e.key)
+	hash.Write(data)
 
-	return h.Sum(nil)
+	return hash.Sum(nil)
 }

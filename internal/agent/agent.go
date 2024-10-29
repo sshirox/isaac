@@ -247,7 +247,7 @@ func (mt *Monitor) bulkSendMetrics() error {
 			SetBody(compressedData)
 
 		if mt.encoder.IsEnabled() {
-			req = req.SetHeader("HashSHA256", mt.encoder.Encode(buf.Bytes()))
+			req = req.SetHeader(crypto.SignHeader, mt.encoder.Encode(buf.Bytes()))
 		}
 
 		resp, respErr := req.Post(bulkSendMetricsAddr())
