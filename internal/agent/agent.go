@@ -2,19 +2,27 @@ package agent
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/go-resty/resty/v2"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/mem"
 	"github.com/sshirox/isaac/internal/compress"
+	"github.com/sshirox/isaac/internal/crypto"
 	errs "github.com/sshirox/isaac/internal/errors"
 	"github.com/sshirox/isaac/internal/metric"
+	"github.com/sshirox/isaac/internal/ratelimit"
 	"github.com/sshirox/isaac/internal/retries"
+	"golang.org/x/sync/errgroup"
 	"log/slog"
 	"math/rand"
 	"net/http"
 	"os"
+	"os/signal"
 	"runtime"
 	"strconv"
+	"syscall"
 	"time"
 )
 
@@ -27,6 +35,9 @@ const (
 type Monitor struct {
 	gauges    map[string]float64
 	pollCount int64
+	client    *resty.Client
+	encoder   *crypto.Encoder
+	limiter   *ratelimit.Limiter
 }
 
 func (mt *Monitor) pollMetrics() {
@@ -64,32 +75,89 @@ func (mt *Monitor) pollMetrics() {
 		"RandomValue":   rand.Float64(),
 	}
 
+	vmem, err := mem.VirtualMemory()
+	if err == nil {
+		gauges["FreeMemory"] = float64(vmem.Free)
+		gauges["TotalMemory"] = float64(vmem.Total)
+	}
+
+	counts, err := cpu.Counts(true)
+	if err == nil {
+		gauges["CPUutilization1"] = float64(counts)
+	}
+
 	mt.gauges = gauges
 	mt.pollCount++
 }
 
 func Run() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+		<-c
+		cancel()
+	}()
+
 	parseFlags()
 	initConf()
-	mt := Monitor{}
+
+	encoder := crypto.NewEncoder(flagEncryptionKey)
+	limiter := ratelimit.New(flagRateLimit)
+	mt := Monitor{
+		encoder: encoder,
+		client:  resty.New(),
+		limiter: limiter,
+	}
 
 	pollTicker := time.NewTicker(time.Duration(pollInterval) * time.Second)
+	defer pollTicker.Stop()
 	reportTicker := time.NewTicker(time.Duration(reportInterval) * time.Second)
+	defer reportTicker.Stop()
 
-	slog.Info("[Run] Agent launched for sending metrics to", "address", serverAddr)
+	group, groupCtx := errgroup.WithContext(ctx)
 
-	for {
-		select {
-		case <-pollTicker.C:
-			slog.Info("[Run] Poll metrics")
-			mt.pollMetrics()
-		case <-reportTicker.C:
-			slog.Info("[Run] Send report")
-			err := mt.bulkSendMetrics()
-			if err != nil {
-				slog.Error("[Run] bulk sending metrics", "error", err)
+	go func() {
+		<-ctx.Done()
+
+		slog.Info("[agent.Run] Graceful shutdown agent")
+	}()
+
+	slog.Info("[agent.Run] Agent launched for sending metrics to", "address", serverAddr)
+
+	group.Go(func() error {
+		for {
+			select {
+			case <-groupCtx.Done():
+				slog.Info("[agent.Run] Stopped poll metrics")
+				return nil
+			case <-pollTicker.C:
+				slog.Info("[agent.Run] Poll metrics")
+				mt.pollMetrics()
 			}
 		}
+	})
+
+	group.Go(func() error {
+		for {
+			select {
+			case <-groupCtx.Done():
+				slog.Info("[agent.Run] Stopped bulk sending metrics")
+				return nil
+			case <-reportTicker.C:
+				slog.Info("[agent.Run] Send report")
+				err := mt.bulkSendMetrics()
+				if err != nil {
+					slog.Error("[agent.Run] bulk sending metrics", "error", err)
+				}
+			}
+		}
+	})
+
+	if err := group.Wait(); err != nil {
+		slog.ErrorContext(ctx, "Run agent", "err", err)
 	}
 }
 
@@ -116,6 +184,19 @@ func initConf() {
 		pollInterval = int64(i)
 	} else {
 		pollInterval = flagPollInterval
+	}
+
+	if envEncryptionKey := os.Getenv("KEY"); envEncryptionKey != "" {
+		flagEncryptionKey = envEncryptionKey
+	}
+
+	if envRateLimitValue := os.Getenv("RATE_LIMIT"); envRateLimitValue != "" {
+		limit, err := strconv.Atoi(envRateLimitValue)
+		if err != nil {
+			slog.Error("rate limit conv", "err", err)
+		} else {
+			flagRateLimit = int64(limit)
+		}
 	}
 }
 
@@ -228,14 +309,21 @@ func (mt *Monitor) bulkSendMetrics() error {
 		return err
 	}
 
-	client := resty.New()
 	err = retries.Retry(func() error {
-		resp, respErr := client.R().
+		req := mt.client.R().
 			SetHeader("Content-Type", "application/json").
 			SetHeader("Content-Encoding", "gzip").
 			SetHeader("Accept-Encoding", "gzip").
-			SetBody(compressedData).
-			Post(bulkSendMetricsAddr())
+			SetBody(compressedData)
+
+		if mt.encoder.IsEnabled() {
+			req = req.SetHeader(crypto.SignHeader, mt.encoder.Encode(buf.Bytes()))
+		}
+
+		mt.limiter.Acquire()
+		defer mt.limiter.Release()
+
+		resp, respErr := req.Post(bulkSendMetricsAddr())
 
 		if respErr != nil {
 			slog.Error("send request", "err", respErr)
