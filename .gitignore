@@ -25,3 +25,8 @@ vendor/
 .vscode
 
 backups/
+
+# Coverage files
+exclude-from-code-coverage.sh
+exclude-from-code-coverage.txt
+profile.cov

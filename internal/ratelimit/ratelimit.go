@@ -4,7 +4,7 @@ type Limiter struct {
 	ch chan struct{}
 }
 
-func New(limit int64) *Limiter {
+func NewLimiter(limit int64) *Limiter {
 	return &Limiter{
 		ch: make(chan struct{}, limit),
 	}

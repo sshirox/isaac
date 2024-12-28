@@ -1,0 +1,43 @@
+Showing nodes accounting for -390.30kB, 23.36% of 1670.84kB total
+      flat  flat%   sum%        cum   cum%
+ -902.59kB 54.02% 54.02%  -902.59kB 54.02%  compress/flate.NewWriter (inline)
+  512.28kB 30.66% 23.36%   512.28kB 30.66%  internal/godebug.registerMetric
+         0     0% 23.36%  -902.59kB 54.02%  compress/gzip.(*Writer).Write
+         0     0% 23.36%   512.28kB 30.66%  database/sql.(*DB).Ping (inline)
+         0     0% 23.36%   512.28kB 30.66%  database/sql.(*DB).PingContext
+         0     0% 23.36%   512.28kB 30.66%  database/sql.(*DB).PingContext.func1
+         0     0% 23.36%   512.28kB 30.66%  database/sql.(*DB).conn
+         0     0% 23.36%   512.28kB 30.66%  database/sql.(*DB).retry
+         0     0% 23.36%   512.28kB 30.66%  database/sql.dsnConnector.Connect
+         0     0% 23.36%  -902.59kB 54.02%  encoding/json.(*Encoder).Encode
+         0     0% 23.36%  -902.59kB 54.02%  github.com/go-chi/chi/v5.(*ChainHandler).ServeHTTP
+         0     0% 23.36%  -902.59kB 54.02%  github.com/go-chi/chi/v5.(*Mux).Mount.func1
+         0     0% 23.36%  -902.59kB 54.02%  github.com/go-chi/chi/v5.(*Mux).ServeHTTP
+         0     0% 23.36%  -902.59kB 54.02%  github.com/go-chi/chi/v5.(*Mux).routeHTTP
+         0     0% 23.36%  -902.59kB 54.02%  github.com/go-chi/chi/v5/middleware.Recoverer.func1
+         0     0% 23.36%   512.28kB 30.66%  github.com/lib/pq.(*Connector).open
+         0     0% 23.36%   512.28kB 30.66%  github.com/lib/pq.DialOpen
+         0     0% 23.36%   512.28kB 30.66%  github.com/lib/pq.Driver.Open
+         0     0% 23.36%   512.28kB 30.66%  github.com/lib/pq.Open (inline)
+         0     0% 23.36%   512.28kB 30.66%  github.com/lib/pq.defaultDialer.DialContext
+         0     0% 23.36%   512.28kB 30.66%  github.com/lib/pq.dial
+         0     0% 23.36%  -902.59kB 54.02%  github.com/sshirox/isaac/internal/logger.WithLogging.func1
+         0     0% 23.36%  -902.59kB 54.02%  github.com/sshirox/isaac/internal/middleware.(*SignValidator).Validate-fm.(*SignValidator).Validate.func1
+         0     0% 23.36%  -902.59kB 54.02%  github.com/sshirox/isaac/internal/middleware.(*compressWriter).Write
+         0     0% 23.36%  -902.59kB 54.02%  github.com/sshirox/isaac/internal/middleware.GZipMiddleware.func1
+         0     0% 23.36%   512.28kB 30.66%  github.com/sshirox/isaac/internal/server.Run
+         0     0% 23.36%  -902.59kB 54.02%  github.com/sshirox/isaac/internal/server.Run.func3.BulkUpdateHandler.1
+         0     0% 23.36%   512.28kB 30.66%  github.com/sshirox/isaac/internal/storage/pg.Ping (inline)
+         0     0% 23.36%   512.28kB 30.66%  internal/godebug.(*Setting).IncNonDefault
+         0     0% 23.36%   512.28kB 30.66%  internal/godebug.(*Setting).register
+         0     0% 23.36%   512.28kB 30.66%  main.main
+         0     0% 23.36%   512.28kB 30.66%  net.(*Dialer).DialContext
+         0     0% 23.36%   512.28kB 30.66%  net.(*sysDialer).dialParallel
+         0     0% 23.36%  -902.59kB 54.02%  net/http.(*conn).serve
+         0     0% 23.36%  -902.59kB 54.02%  net/http.HandlerFunc.ServeHTTP
+         0     0% 23.36%  -902.59kB 54.02%  net/http.serverHandler.ServeHTTP
+         0     0% 23.36%   512.28kB 30.66%  runtime.main
+         0     0% 23.36%   512.28kB 30.66%  sync.(*Once).Do (inline)
+         0     0% 23.36%   512.28kB 30.66%  sync.(*Once).doSlow
+         0     0% 23.36%   512.28kB 30.66%  time.NewTimer
+         0     0% 23.36%   512.28kB 30.66%  time.syncTimer

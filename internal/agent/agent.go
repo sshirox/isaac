@@ -105,7 +105,7 @@ func Run() {
 	initConf()
 
 	encoder := crypto.NewEncoder(flagEncryptionKey)
-	limiter := ratelimit.New(flagRateLimit)
+	limiter := ratelimit.NewLimiter(flagRateLimit)
 	mt := Monitor{
 		encoder: encoder,
 		client:  resty.New(),
