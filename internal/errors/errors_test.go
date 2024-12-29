@@ -1,10 +1,11 @@
 package errors
 
 import (
+	"testing"
+
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestIsRetryPGErr(t *testing.T) {

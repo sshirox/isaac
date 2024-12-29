@@ -2,8 +2,16 @@ package server
 
 import (
 	"context"
+	"log"
+	"log/slog"
+	"net/http"
+	_ "net/http/pprof"
+	"os"
+	"strconv"
+
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+
 	"github.com/sshirox/isaac/internal/backup"
 	"github.com/sshirox/isaac/internal/crypto"
 	"github.com/sshirox/isaac/internal/handler"
@@ -11,12 +19,6 @@ import (
 	"github.com/sshirox/isaac/internal/middleware"
 	"github.com/sshirox/isaac/internal/storage"
 	"github.com/sshirox/isaac/internal/storage/pg"
-	"log"
-	"log/slog"
-	"net/http"
-	_ "net/http/pprof"
-	"os"
-	"strconv"
 )
 
 const (

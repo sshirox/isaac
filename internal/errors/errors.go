@@ -2,9 +2,10 @@ package errors
 
 import (
 	"errors"
+	"slices"
+
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
-	"slices"
 )
 
 var (

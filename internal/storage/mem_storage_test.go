@@ -2,8 +2,9 @@ package storage
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMemStorage_ReceiveAllCounters(t *testing.T) {

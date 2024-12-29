@@ -3,11 +3,13 @@ package backup
 import (
 	"bufio"
 	"encoding/json"
-	"github.com/pkg/errors"
-	"github.com/sshirox/isaac/internal/storage"
 	"log/slog"
 	"os"
 	"path"
+
+	"github.com/pkg/errors"
+
+	"github.com/sshirox/isaac/internal/storage"
 )
 
 type backupFile struct {

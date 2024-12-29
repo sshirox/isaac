@@ -1,10 +1,11 @@
 package backup
 
 import (
-	"github.com/sshirox/isaac/internal/storage"
 	"log/slog"
 	"os"
 	"time"
+
+	"github.com/sshirox/isaac/internal/storage"
 )
 
 func RunWorker(

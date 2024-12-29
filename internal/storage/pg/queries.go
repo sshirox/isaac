@@ -3,9 +3,10 @@ package pg
 import (
 	"context"
 	"database/sql"
+	"log/slog"
+
 	errs "github.com/sshirox/isaac/internal/errors"
 	"github.com/sshirox/isaac/internal/retries"
-	"log/slog"
 )
 
 type ExecContext interface {

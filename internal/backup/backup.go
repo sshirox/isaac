@@ -2,9 +2,11 @@ package backup
 
 import (
 	"encoding/json"
-	"github.com/pkg/errors"
-	"github.com/sshirox/isaac/internal/storage"
 	"os"
+
+	"github.com/pkg/errors"
+
+	"github.com/sshirox/isaac/internal/storage"
 )
 
 func SaveBackup(ms *storage.MemStorage, f *os.File) error {

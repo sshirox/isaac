@@ -5,16 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/go-resty/resty/v2"
-	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/mem"
-	"github.com/sshirox/isaac/internal/compress"
-	"github.com/sshirox/isaac/internal/crypto"
-	errs "github.com/sshirox/isaac/internal/errors"
-	"github.com/sshirox/isaac/internal/metric"
-	"github.com/sshirox/isaac/internal/ratelimit"
-	"github.com/sshirox/isaac/internal/retries"
-	"golang.org/x/sync/errgroup"
 	"log/slog"
 	"math/rand"
 	"net/http"
@@ -24,6 +14,18 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+
+	"github.com/go-resty/resty/v2"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/mem"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/sshirox/isaac/internal/compress"
+	"github.com/sshirox/isaac/internal/crypto"
+	errs "github.com/sshirox/isaac/internal/errors"
+	"github.com/sshirox/isaac/internal/metric"
+	"github.com/sshirox/isaac/internal/ratelimit"
+	"github.com/sshirox/isaac/internal/retries"
 )
 
 const (

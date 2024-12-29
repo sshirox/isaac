@@ -5,13 +5,15 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/go-chi/chi/v5"
-	"github.com/sshirox/isaac/internal/metric"
 	"html/template"
 	"io"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/go-chi/chi/v5"
+
+	"github.com/sshirox/isaac/internal/metric"
 )
 
 type Repository interface {

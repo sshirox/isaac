@@ -2,8 +2,9 @@ package retries
 
 import (
 	"errors"
-	errs "github.com/sshirox/isaac/internal/errors"
 	"time"
+
+	errs "github.com/sshirox/isaac/internal/errors"
 )
 
 func Retry(op func() error) error {

@@ -3,9 +3,11 @@ package compress
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/sshirox/isaac/internal/metric"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/sshirox/isaac/internal/metric"
 )
 
 func TestGZipCompress(t *testing.T) {

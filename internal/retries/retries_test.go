@@ -1,8 +1,9 @@
 package retries
 
 import (
-	"github.com/sshirox/isaac/internal/errors"
 	"testing"
+
+	"github.com/sshirox/isaac/internal/errors"
 )
 
 func TestRetry(t *testing.T) {
