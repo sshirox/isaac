@@ -17,6 +17,7 @@ type backupFile struct {
 	Counters map[string]int64   `json:"counters"`
 }
 
+// RestoreMetrics metrics from file to storage
 func RestoreMetrics(
 	ms *storage.MemStorage,
 	storagePath string,

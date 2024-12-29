@@ -9,6 +9,7 @@ import (
 	"github.com/sshirox/isaac/internal/storage"
 )
 
+// SaveBackup save metrics from storage to file
 func SaveBackup(ms *storage.MemStorage, f *os.File) error {
 	m := ms.ReceiveAllMetrics()
 

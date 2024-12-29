@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 )
 
+// GZipCompress compresses the passed data using a deflate algorithm
 func GZipCompress(src []byte) ([]byte, error) {
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)

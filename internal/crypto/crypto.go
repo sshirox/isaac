@@ -15,6 +15,7 @@ type Encoder struct {
 	isEnabled bool
 }
 
+// NewEncoder create new encoder instance
 func NewEncoder(key string) *Encoder {
 	return &Encoder{
 		key:       []byte(key),
@@ -22,6 +23,7 @@ func NewEncoder(key string) *Encoder {
 	}
 }
 
+// Encode encode passed data
 func (e Encoder) Encode(data []byte) string {
 	if !e.isEnabled {
 		return ""
@@ -30,6 +32,7 @@ func (e Encoder) Encode(data []byte) string {
 	return hex.EncodeToString(e.sign(data))
 }
 
+// Validate validate passed data by sign
 func (e Encoder) Validate(data []byte, sign string) (bool, string) {
 	if !e.isEnabled {
 		return false, ""
