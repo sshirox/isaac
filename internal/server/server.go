@@ -2,8 +2,16 @@ package server
 
 import (
 	"context"
+	"log"
+	"log/slog"
+	"net/http"
+	_ "net/http/pprof"
+	"os"
+	"strconv"
+
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+
 	"github.com/sshirox/isaac/internal/backup"
 	"github.com/sshirox/isaac/internal/crypto"
 	"github.com/sshirox/isaac/internal/handler"
@@ -11,10 +19,6 @@ import (
 	"github.com/sshirox/isaac/internal/middleware"
 	"github.com/sshirox/isaac/internal/storage"
 	"github.com/sshirox/isaac/internal/storage/pg"
-	"log/slog"
-	"net/http"
-	"os"
-	"strconv"
 )
 
 const (
@@ -56,6 +60,10 @@ func Run() error {
 	r.Use(logger.WithLogging)
 	r.Use(middleware.GZipMiddleware)
 	s := storage.NewMemStorage()
+
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 
 	r.Get("/", handler.IndexHandler(s))
 	r.Route("/update", func(r chi.Router) {

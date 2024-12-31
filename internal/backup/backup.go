@@ -2,11 +2,14 @@ package backup
 
 import (
 	"encoding/json"
-	"github.com/pkg/errors"
-	"github.com/sshirox/isaac/internal/storage"
 	"os"
+
+	"github.com/pkg/errors"
+
+	"github.com/sshirox/isaac/internal/storage"
 )
 
+// SaveBackup save metrics from storage to file
 func SaveBackup(ms *storage.MemStorage, f *os.File) error {
 	m := ms.ReceiveAllMetrics()
 

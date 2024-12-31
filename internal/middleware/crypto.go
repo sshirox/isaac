@@ -2,10 +2,11 @@ package middleware
 
 import (
 	"bytes"
-	"github.com/sshirox/isaac/internal/crypto"
 	"io"
 	"log/slog"
 	"net/http"
+
+	"github.com/sshirox/isaac/internal/crypto"
 )
 
 type SignValidator struct {

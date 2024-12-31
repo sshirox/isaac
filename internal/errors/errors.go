@@ -2,9 +2,10 @@ package errors
 
 import (
 	"errors"
+	"slices"
+
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
-	"slices"
 )
 
 var (
@@ -25,6 +26,7 @@ var (
 	}
 )
 
+// IsRetryPGErr checks that the error is a retriable PG error
 func IsRetryPGErr(pgErr error) bool {
 	var err *pgconn.PgError
 	ok := errors.As(pgErr, &err)

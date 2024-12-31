@@ -2,10 +2,12 @@ package retries
 
 import (
 	"errors"
-	errs "github.com/sshirox/isaac/internal/errors"
 	"time"
+
+	errs "github.com/sshirox/isaac/internal/errors"
 )
 
+// Retry repeats a function with an error at preset intervals
 func Retry(op func() error) error {
 	var err error
 	for _, interval := range intervals {

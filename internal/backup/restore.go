@@ -3,11 +3,13 @@ package backup
 import (
 	"bufio"
 	"encoding/json"
-	"github.com/pkg/errors"
-	"github.com/sshirox/isaac/internal/storage"
 	"log/slog"
 	"os"
 	"path"
+
+	"github.com/pkg/errors"
+
+	"github.com/sshirox/isaac/internal/storage"
 )
 
 type backupFile struct {
@@ -15,6 +17,7 @@ type backupFile struct {
 	Counters map[string]int64   `json:"counters"`
 }
 
+// RestoreMetrics metrics from file to storage
 func RestoreMetrics(
 	ms *storage.MemStorage,
 	storagePath string,

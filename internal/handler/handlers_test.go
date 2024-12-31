@@ -3,11 +3,12 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/sshirox/isaac/internal/metric"
-	"github.com/sshirox/isaac/internal/storage"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/sshirox/isaac/internal/metric"
+	"github.com/sshirox/isaac/internal/storage"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"

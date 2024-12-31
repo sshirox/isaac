@@ -3,12 +3,14 @@ package pg
 import (
 	"context"
 	"database/sql"
-	_ "github.com/lib/pq"
-	"github.com/pkg/errors"
-	"github.com/sshirox/isaac/internal/metric"
-	"github.com/sshirox/isaac/internal/storage"
 	"log/slog"
 	"time"
+
+	_ "github.com/lib/pq"
+	"github.com/pkg/errors"
+
+	"github.com/sshirox/isaac/internal/metric"
+	"github.com/sshirox/isaac/internal/storage"
 )
 
 const (
