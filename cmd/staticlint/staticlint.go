@@ -52,6 +52,8 @@ import (
 	"golang.org/x/tools/go/analysis/passes/unusedwrite"
 	"golang.org/x/tools/go/analysis/passes/usesgenerics"
 	"honnef.co/go/tools/staticcheck"
+
+	logger "log/slog"
 )
 
 func main() {
@@ -59,6 +61,8 @@ func main() {
 	for _, v := range staticcheck.Analyzers {
 		staticchecks = append(staticchecks, v.Analyzer)
 	}
+
+	logger.Info("static checks", "size", len(staticchecks))
 
 	multichecker.Main(
 		appends.Analyzer,
