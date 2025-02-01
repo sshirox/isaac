@@ -8,6 +8,7 @@ var (
 	flagPollInterval   int64
 	flagEncryptionKey  string
 	flagRateLimit      int64
+	flagCryptoKeyPath  string
 	serverAddr         string
 	reportInterval     int64
 	pollInterval       int64
@@ -19,5 +20,6 @@ func parseFlags() {
 	flag.Int64Var(&flagPollInterval, "p", 2, "poll interval in seconds")
 	flag.StringVar(&flagEncryptionKey, "k", "", "encryption key")
 	flag.Int64Var(&flagRateLimit, "l", 10, "rate limit")
+	flag.StringVar(&flagCryptoKeyPath, "c", "", "crypto key path")
 	flag.Parse()
 }

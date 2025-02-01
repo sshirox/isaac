@@ -13,6 +13,7 @@ var (
 	flagRestore         bool
 	flagDatabaseDSN     string
 	flagEncryptionKey   string
+	flagCryptoKeyPath   string
 )
 
 func parseFlags() {
@@ -23,6 +24,7 @@ func parseFlags() {
 	flag.StringVar(&flagRestoreStr, "r", "true", "restore")
 	flag.StringVar(&flagDatabaseDSN, "d", "", "database DSN")
 	flag.StringVar(&flagEncryptionKey, "k", "", "encryption key")
+	flag.StringVar(&flagCryptoKeyPath, "c", "", "crypto key path")
 
 	flag.Parse()
 }

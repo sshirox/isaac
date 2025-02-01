@@ -3,8 +3,10 @@ package agent
 import (
 	"bytes"
 	"context"
+	"crypto/rsa"
 	"encoding/json"
 	"fmt"
+	"github.com/pkg/errors"
 	"log/slog"
 	"math/rand"
 	"net/http"
@@ -32,6 +34,10 @@ const (
 	proto                 = "http"
 	updateMetricsPath     = "update"
 	bulkUpdateMetricsPath = "updates"
+)
+
+var (
+	publicKey *rsa.PublicKey
 )
 
 type Monitor struct {
@@ -200,6 +206,18 @@ func initConf() {
 			flagRateLimit = int64(limit)
 		}
 	}
+
+	if envCryptoKey := os.Getenv("CRYPTO_KEY"); envCryptoKey != "" {
+		flagCryptoKeyPath = envCryptoKey
+	}
+
+	var err error
+	if flagCryptoKeyPath != "" {
+		publicKey, err = crypto.ReadPublicKey(flagCryptoKeyPath)
+		if err != nil {
+			slog.Info("[agent.initConf] read public key")
+		}
+	}
 }
 
 func (mt *Monitor) processReport() error {
@@ -305,7 +323,19 @@ func (mt *Monitor) bulkSendMetrics() error {
 		slog.Error("[Bulk_Send_Metrics] encode metrics", "err", err)
 		return err
 	}
-	compressedData, err := compress.GZipCompress(buf.Bytes())
+
+	var data []byte
+	if publicKey != nil {
+		encData, encErr := crypto.Encrypt(publicKey, buf.Bytes())
+		if encErr != nil {
+			return errors.Wrap(encErr, "[agent.bulkSendMetrics] encrypt data")
+		}
+		data = encData
+	} else {
+		data = buf.Bytes()
+	}
+
+	compressedData, err := compress.GZipCompress(data)
 	if err != nil {
 		slog.Error("[Bulk_Send_Metrics] compress metrics", "err", err)
 		return err

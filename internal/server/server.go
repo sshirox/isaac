@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"crypto/rsa"
+	"github.com/pkg/errors"
 	"log"
 	"log/slog"
 	"net/http"
@@ -30,6 +32,7 @@ const (
 
 var (
 	storageSource string
+	privateKey    *rsa.PrivateKey
 )
 
 func Run() error {
@@ -54,6 +57,7 @@ func Run() error {
 	}
 	encoder := crypto.NewEncoder(flagEncryptionKey)
 	signValidator := middleware.NewSignValidator(encoder).Validate
+	cryptoDecoder := middleware.NewCryptoDecoder(privateKey).Decode
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Recoverer)
@@ -71,7 +75,11 @@ func Run() error {
 		r.Post("/{type}/{name}/{value}", handler.UpdateMetricsHandler(s))
 	})
 	r.Route("/updates", func(r chi.Router) {
-		r.With(signValidator).Post("/", handler.BulkUpdateHandler(s))
+		if privateKey != nil {
+			r.With(signValidator, cryptoDecoder).Post("/", handler.BulkUpdateHandler(s))
+		} else {
+			r.With(signValidator).Post("/", handler.BulkUpdateHandler(s))
+		}
 	})
 	r.Route("/value", func(r chi.Router) {
 		r.Post("/", handler.ValueByContentTypeHandler(s))
@@ -158,6 +166,21 @@ func initConf() error {
 
 	if envEncryptionKey := os.Getenv("KEY"); envEncryptionKey != "" {
 		flagEncryptionKey = envEncryptionKey
+	}
+
+	if envCryptoKey := os.Getenv("CRYPTO_KEY"); envCryptoKey != "" {
+		flagCryptoKeyPath = envCryptoKey
+	}
+
+	if flagCryptoKeyPath != "" {
+
+	}
+
+	if flagCryptoKeyPath != "" {
+		privateKey, err = crypto.ReadPrivateKey(flagCryptoKeyPath)
+		if err != nil {
+			return errors.Wrap(err, "[server.initConf] read private key")
+		}
 	}
 
 	if flagDatabaseDSN != "" {
