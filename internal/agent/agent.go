@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"context"
+	crand "crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
@@ -326,7 +327,7 @@ func (mt *Monitor) bulkSendMetrics() error {
 
 	var data []byte
 	if publicKey != nil {
-		encData, encErr := crypto.Encrypt(publicKey, buf.Bytes())
+		encData, encErr := rsa.EncryptPKCS1v15(crand.Reader, publicKey, buf.Bytes())
 		if encErr != nil {
 			return errors.Wrap(encErr, "[agent.bulkSendMetrics] encrypt data")
 		}

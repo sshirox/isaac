@@ -2,7 +2,6 @@ package crypto
 
 import (
 	"crypto/hmac"
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -101,8 +100,4 @@ func ReadPublicKey(path string) (*rsa.PublicKey, error) {
 	}
 
 	return pkey, nil
-}
-
-func Encrypt(pkey *rsa.PublicKey, data []byte) ([]byte, error) {
-	return rsa.EncryptPKCS1v15(rand.Reader, pkey, data)
 }
