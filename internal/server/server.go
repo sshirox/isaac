@@ -173,10 +173,6 @@ func initConf() error {
 	}
 
 	if flagCryptoKeyPath != "" {
-
-	}
-
-	if flagCryptoKeyPath != "" {
 		privateKey, err = crypto.ReadPrivateKey(flagCryptoKeyPath)
 		if err != nil {
 			return errors.Wrap(err, "[server.initConf] read private key")
