@@ -187,6 +187,17 @@ func initConf() error {
 		storageSource = memoryStorageSource
 	}
 
+	if envConfigPath := os.Getenv("CONFIG"); envConfigPath != "" {
+		flagConfigPath = envConfigPath
+	}
+
+	if flagConfigPath != "" {
+		err := loadConfigs(flagConfigPath)
+		if err != nil {
+			return errors.Wrap(err, "[server.initConf] load config file")
+		}
+	}
+
 	if err = logger.Initialize(flagLogLevel); err != nil {
 		return err
 	}
