@@ -41,7 +41,7 @@ func Run() error {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer cancel()
 
-	parseFlags()g
+	parseFlags()
 	err := initConf()
 
 	if err != nil {
