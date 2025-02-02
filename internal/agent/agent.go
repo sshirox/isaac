@@ -100,15 +100,8 @@ func (mt *Monitor) pollMetrics() {
 }
 
 func Run() {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go func() {
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-
-		<-c
-		cancel()
-	}()
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	defer cancel()
 
 	parseFlags()
 	initConf()
@@ -127,12 +120,6 @@ func Run() {
 	defer reportTicker.Stop()
 
 	group, groupCtx := errgroup.WithContext(ctx)
-
-	go func() {
-		<-ctx.Done()
-
-		slog.Info("[agent.Run] Graceful shutdown agent")
-	}()
 
 	slog.Info("[agent.Run] Agent launched for sending metrics to", "address", serverAddr)
 

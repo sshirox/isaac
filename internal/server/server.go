@@ -9,7 +9,9 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -36,7 +38,10 @@ var (
 )
 
 func Run() error {
-	parseFlags()
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	defer cancel()
+
+	parseFlags()g
 	err := initConf()
 
 	if err != nil {
@@ -99,8 +104,6 @@ func Run() error {
 
 		go backup.RunWorker(ms, flagStoreInterval, f, make(chan struct{}))
 	case dbStorageSource:
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 		err = pg.Bootstrap(db, ctx)
 		if err != nil {
 			slog.Error("bootstrap database", "err", err)
