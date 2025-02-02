@@ -12,6 +12,7 @@ var (
 	serverAddr         string
 	reportInterval     int64
 	pollInterval       int64
+	flagConfigPath     string
 )
 
 func parseFlags() {
@@ -20,6 +21,7 @@ func parseFlags() {
 	flag.Int64Var(&flagPollInterval, "p", 2, "poll interval in seconds")
 	flag.StringVar(&flagEncryptionKey, "k", "", "encryption key")
 	flag.Int64Var(&flagRateLimit, "l", 10, "rate limit")
-	flag.StringVar(&flagCryptoKeyPath, "c", "", "crypto key path")
+	flag.StringVar(&flagCryptoKeyPath, "ck", "", "crypto key path")
+	flag.StringVar(&flagConfigPath, "c", "", "config file path")
 	flag.Parse()
 }

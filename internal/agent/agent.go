@@ -216,7 +216,18 @@ func initConf() {
 	if flagCryptoKeyPath != "" {
 		publicKey, err = crypto.ReadPublicKey(flagCryptoKeyPath)
 		if err != nil {
-			slog.Info("[agent.initConf] read public key")
+			slog.Error("[agent.initConf] read public key")
+		}
+	}
+
+	if envConfigPath := os.Getenv("CONFIG"); envConfigPath != "" {
+		flagConfigPath = envConfigPath
+	}
+
+	if flagConfigPath != "" {
+		err := loadConfigs(flagConfigPath)
+		if err != nil {
+			slog.Error("[server.initConf] load config file")
 		}
 	}
 }
