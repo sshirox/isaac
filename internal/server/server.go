@@ -2,12 +2,16 @@ package server
 
 import (
 	"context"
+	"crypto/rsa"
+	"github.com/pkg/errors"
 	"log"
 	"log/slog"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -30,9 +34,13 @@ const (
 
 var (
 	storageSource string
+	privateKey    *rsa.PrivateKey
 )
 
 func Run() error {
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	defer cancel()
+
 	parseFlags()
 	err := initConf()
 
@@ -54,6 +62,7 @@ func Run() error {
 	}
 	encoder := crypto.NewEncoder(flagEncryptionKey)
 	signValidator := middleware.NewSignValidator(encoder).Validate
+	cryptoDecoder := middleware.NewCryptoDecoder(privateKey).Decode
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Recoverer)
@@ -71,7 +80,11 @@ func Run() error {
 		r.Post("/{type}/{name}/{value}", handler.UpdateMetricsHandler(s))
 	})
 	r.Route("/updates", func(r chi.Router) {
-		r.With(signValidator).Post("/", handler.BulkUpdateHandler(s))
+		if privateKey != nil {
+			r.With(signValidator, cryptoDecoder).Post("/", handler.BulkUpdateHandler(s))
+		} else {
+			r.With(signValidator).Post("/", handler.BulkUpdateHandler(s))
+		}
 	})
 	r.Route("/value", func(r chi.Router) {
 		r.Post("/", handler.ValueByContentTypeHandler(s))
@@ -91,8 +104,6 @@ func Run() error {
 
 		go backup.RunWorker(ms, flagStoreInterval, f, make(chan struct{}))
 	case dbStorageSource:
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 		err = pg.Bootstrap(db, ctx)
 		if err != nil {
 			slog.Error("bootstrap database", "err", err)
@@ -160,12 +171,34 @@ func initConf() error {
 		flagEncryptionKey = envEncryptionKey
 	}
 
+	if envCryptoKey := os.Getenv("CRYPTO_KEY"); envCryptoKey != "" {
+		flagCryptoKeyPath = envCryptoKey
+	}
+
+	if flagCryptoKeyPath != "" {
+		privateKey, err = crypto.ReadPrivateKey(flagCryptoKeyPath)
+		if err != nil {
+			return errors.Wrap(err, "[server.initConf] read private key")
+		}
+	}
+
 	if flagDatabaseDSN != "" {
 		storageSource = dbStorageSource
 	} else if flagFileStoragePath != "" {
 		storageSource = fileStorageSource
 	} else {
 		storageSource = memoryStorageSource
+	}
+
+	if envConfigPath := os.Getenv("CONFIG"); envConfigPath != "" {
+		flagConfigPath = envConfigPath
+	}
+
+	if flagConfigPath != "" {
+		err := loadConfigs(flagConfigPath)
+		if err != nil {
+			return errors.Wrap(err, "[server.initConf] load config file")
+		}
 	}
 
 	if err = logger.Initialize(flagLogLevel); err != nil {

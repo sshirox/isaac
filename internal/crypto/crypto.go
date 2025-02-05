@@ -2,8 +2,13 @@ package crypto
 
 import (
 	"crypto/hmac"
+	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/hex"
+	"encoding/pem"
+	"github.com/pkg/errors"
+	"os"
 )
 
 const (
@@ -57,4 +62,42 @@ func (e Encoder) sign(data []byte) []byte {
 	hash.Write(data)
 
 	return hash.Sum(nil)
+}
+
+func ReadPrivateKey(path string) (*rsa.PrivateKey, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	dec, _ := pem.Decode(data)
+	if dec == nil || dec.Type != "RSA PRIVATE KEY" {
+		return nil, errors.New("invalid private key file")
+	}
+
+	return x509.ParsePKCS1PrivateKey(dec.Bytes)
+}
+
+func ReadPublicKey(path string) (*rsa.PublicKey, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	dec, _ := pem.Decode(data)
+	if dec == nil || dec.Type != "PUBLIC KEY" {
+		return nil, errors.New("invalid public key file")
+	}
+
+	key, err := x509.ParsePKIXPublicKey(dec.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	pkey, ok := key.(*rsa.PublicKey)
+	if !ok {
+		return nil, errors.New("invalid public key")
+	}
+
+	return pkey, nil
 }

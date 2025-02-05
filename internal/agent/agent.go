@@ -3,8 +3,11 @@ package agent
 import (
 	"bytes"
 	"context"
+	crand "crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
 	"fmt"
+	"github.com/pkg/errors"
 	"log/slog"
 	"math/rand"
 	"net/http"
@@ -32,6 +35,10 @@ const (
 	proto                 = "http"
 	updateMetricsPath     = "update"
 	bulkUpdateMetricsPath = "updates"
+)
+
+var (
+	publicKey *rsa.PublicKey
 )
 
 type Monitor struct {
@@ -93,15 +100,8 @@ func (mt *Monitor) pollMetrics() {
 }
 
 func Run() {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go func() {
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-
-		<-c
-		cancel()
-	}()
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	defer cancel()
 
 	parseFlags()
 	initConf()
@@ -120,12 +120,6 @@ func Run() {
 	defer reportTicker.Stop()
 
 	group, groupCtx := errgroup.WithContext(ctx)
-
-	go func() {
-		<-ctx.Done()
-
-		slog.Info("[agent.Run] Graceful shutdown agent")
-	}()
 
 	slog.Info("[agent.Run] Agent launched for sending metrics to", "address", serverAddr)
 
@@ -198,6 +192,29 @@ func initConf() {
 			slog.Error("rate limit conv", "err", err)
 		} else {
 			flagRateLimit = int64(limit)
+		}
+	}
+
+	if envCryptoKey := os.Getenv("CRYPTO_KEY"); envCryptoKey != "" {
+		flagCryptoKeyPath = envCryptoKey
+	}
+
+	var err error
+	if flagCryptoKeyPath != "" {
+		publicKey, err = crypto.ReadPublicKey(flagCryptoKeyPath)
+		if err != nil {
+			slog.Error("[agent.initConf] read public key")
+		}
+	}
+
+	if envConfigPath := os.Getenv("CONFIG"); envConfigPath != "" {
+		flagConfigPath = envConfigPath
+	}
+
+	if flagConfigPath != "" {
+		err := loadConfigs(flagConfigPath)
+		if err != nil {
+			slog.Error("[server.initConf] load config file")
 		}
 	}
 }
@@ -305,7 +322,19 @@ func (mt *Monitor) bulkSendMetrics() error {
 		slog.Error("[Bulk_Send_Metrics] encode metrics", "err", err)
 		return err
 	}
-	compressedData, err := compress.GZipCompress(buf.Bytes())
+
+	var data []byte
+	if publicKey != nil {
+		encData, encErr := rsa.EncryptPKCS1v15(crand.Reader, publicKey, buf.Bytes())
+		if encErr != nil {
+			return errors.Wrap(encErr, "[agent.bulkSendMetrics] encrypt data")
+		}
+		data = encData
+	} else {
+		data = buf.Bytes()
+	}
+
+	compressedData, err := compress.GZipCompress(data)
 	if err != nil {
 		slog.Error("[Bulk_Send_Metrics] compress metrics", "err", err)
 		return err
