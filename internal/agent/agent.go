@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/sshirox/isaac/internal/net"
 	"log/slog"
 	"math/rand"
 	"net/http"
@@ -346,6 +347,12 @@ func (mt *Monitor) bulkSendMetrics() error {
 			SetHeader("Content-Encoding", "gzip").
 			SetHeader("Accept-Encoding", "gzip").
 			SetBody(compressedData)
+
+		var ipAddr string
+		ipAddr, err = net.RetrieveLocalIP()
+		if err == nil {
+			req.SetHeader("X-Real-IP", ipAddr)
+		}
 
 		if mt.encoder.IsEnabled() {
 			req = req.SetHeader(crypto.SignHeader, mt.encoder.Encode(buf.Bytes()))

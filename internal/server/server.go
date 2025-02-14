@@ -68,6 +68,14 @@ func Run() error {
 	r.Use(chimiddleware.Recoverer)
 	r.Use(logger.WithLogging)
 	r.Use(middleware.GZipMiddleware)
+
+	trustedSubnetMiddleware, err := middleware.TrustedSubnetMiddleware(flagTrustedSubnet)
+	if err != nil {
+		slog.Error("Failed to initialize middleware", slog.Any("error", err))
+	} else {
+		r.Use(trustedSubnetMiddleware)
+	}
+
 	s := storage.NewMemStorage()
 
 	go func() {
@@ -188,6 +196,10 @@ func initConf() error {
 		storageSource = fileStorageSource
 	} else {
 		storageSource = memoryStorageSource
+	}
+
+	if envTrustedSubnet := os.Getenv("TRUSTED_SUBNET"); envTrustedSubnet != "" {
+		flagTrustedSubnet = envTrustedSubnet
 	}
 
 	if envConfigPath := os.Getenv("CONFIG"); envConfigPath != "" {

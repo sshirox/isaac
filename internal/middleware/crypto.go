@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 
 	"github.com/sshirox/isaac/internal/crypto"
@@ -87,4 +88,49 @@ func (d *CryptoDecoder) Decode(next http.Handler) http.Handler {
 		r.Body = io.NopCloser(bytes.NewBuffer(dec))
 		next.ServeHTTP(w, r)
 	})
+}
+
+// TrustedSubnetMiddleware verifies that the client's IP address is within the trusted subnet.
+func TrustedSubnetMiddleware(trustedSubnet string) (func(http.Handler) http.Handler, error) {
+	if trustedSubnet == "" {
+		return func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				next.ServeHTTP(w, r)
+			})
+		}, nil
+	}
+
+	_, subnet, err := net.ParseCIDR(trustedSubnet)
+	if err != nil {
+		slog.Error("Failed to parse trusted subnet",
+			slog.String("subnet", trustedSubnet),
+			slog.Any("error", err),
+		)
+		return nil, err
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+
+			ipStr := r.Header.Get("X-Real-IP")
+			if ipStr == "" {
+				slog.WarnContext(ctx, "X-Real-IP header not found")
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+
+			ip := net.ParseIP(ipStr)
+			if ip == nil || !subnet.Contains(ip) {
+				slog.WarnContext(ctx, "Invalid X-Real-IP header",
+					slog.String("IP", ipStr),
+					slog.String("subnet", trustedSubnet),
+				)
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}, nil
 }

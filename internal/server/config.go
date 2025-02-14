@@ -16,6 +16,7 @@ type Config struct {
 	HashKey         string `json:"hash_key"`
 	CryptoKeyPath   string `json:"crypto_key"`
 	Restore         string `json:"restore"`
+	TrustedSubnet   string `json:"trusted_subnet"`
 }
 
 func loadConfigs(path string) error {
@@ -55,6 +56,10 @@ func loadConfigs(path string) error {
 
 	if cfg.CryptoKeyPath != "" && flagCryptoKeyPath == "" {
 		flagCryptoKeyPath = cfg.CryptoKeyPath
+	}
+
+	if cfg.TrustedSubnet != "" {
+		flagTrustedSubnet = cfg.TrustedSubnet
 	}
 
 	return nil

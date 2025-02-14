@@ -15,6 +15,7 @@ var (
 	flagEncryptionKey   string
 	flagCryptoKeyPath   string
 	flagConfigPath      string
+	flagTrustedSubnet   string
 )
 
 func parseFlags() {
@@ -27,6 +28,7 @@ func parseFlags() {
 	flag.StringVar(&flagEncryptionKey, "k", "", "encryption key")
 	flag.StringVar(&flagCryptoKeyPath, "ck", "", "crypto key path")
 	flag.StringVar(&flagConfigPath, "c", "", "config file path")
+	flag.StringVar(&flagTrustedSubnet, "t", "", "trusted subnet")
 
 	flag.Parse()
 }
