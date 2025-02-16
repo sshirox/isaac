@@ -9,6 +9,9 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/sshirox/isaac/internal/net"
+	pb "github.com/sshirox/isaac/internal/proto/metrics/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"log/slog"
 	"math/rand"
 	"net/http"
@@ -145,9 +148,17 @@ func Run() {
 				return nil
 			case <-reportTicker.C:
 				slog.Info("[agent.Run] Send report")
-				err := mt.bulkSendMetrics()
-				if err != nil {
-					slog.Error("[agent.Run] bulk sending metrics", "error", err)
+
+				if flagGRPCAddr != "" {
+					err := mt.sendGRPCMetrics(flagGRPCAddr)
+					if err != nil {
+						slog.Error("[agent.Run] bulk sending metrics", "error", err)
+					}
+				} else {
+					err := mt.bulkSendMetrics()
+					if err != nil {
+						slog.Error("[agent.Run] bulk sending metrics", "error", err)
+					}
 				}
 			}
 		}
@@ -198,6 +209,10 @@ func initConf() {
 
 	if envCryptoKey := os.Getenv("CRYPTO_KEY"); envCryptoKey != "" {
 		flagCryptoKeyPath = envCryptoKey
+	}
+
+	if envGRPCAddr := os.Getenv("GRPC_ADDRESS"); envGRPCAddr != "" {
+		flagGRPCAddr = envGRPCAddr
 	}
 
 	var err error
@@ -386,6 +401,48 @@ func (mt *Monitor) bulkSendMetrics() error {
 	if err != nil {
 		slog.Error("[Bulk_Send_Metrics] sending metrics", "err", err)
 	}
+
+	return nil
+}
+
+func (mt *Monitor) sendGRPCMetrics(address string) error {
+	var pbMetrics []*pb.Metric
+
+	for id, val := range mt.gauges {
+		pbMetrics = append(pbMetrics, &pb.Metric{
+			Name:  id,
+			Kind:  metric.GaugeMetricType,
+			Value: &val,
+		})
+	}
+
+	pbMetrics = append(pbMetrics, &pb.Metric{
+		Name:  "PollCount",
+		Kind:  metric.CounterMetricType,
+		Delta: &mt.pollCount,
+	})
+
+	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		slog.Error("Failed to connect to gRPC server", slog.String("address", address), slog.Any("error", err))
+		return err
+	}
+	defer conn.Close()
+
+	client := pb.NewMetricsServiceClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	request := &pb.SendMetricsRequest{Metrics: pbMetrics}
+
+	response, err := client.SendMetrics(ctx, request)
+	if err != nil {
+		slog.Error("Failed to send metrics", slog.Any("error", err))
+		return err
+	}
+
+	slog.Info("Successfully sent metrics", slog.Any("metrics", pbMetrics))
+	slog.Info("Received response", slog.Any("response", response))
 
 	return nil
 }

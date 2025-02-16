@@ -6,6 +6,7 @@ import (
 
 var (
 	flagRunAddr         string
+	flagGRPCAddr        string
 	flagLogLevel        string
 	flagStoreInterval   int64
 	flagFileStoragePath string
@@ -20,6 +21,7 @@ var (
 
 func parseFlags() {
 	flag.StringVar(&flagRunAddr, "a", "localhost:8080", "address and port to run server")
+	flag.StringVar(&flagGRPCAddr, "ga", "", "server grpc address")
 	flag.StringVar(&flagLogLevel, "l", "info", "log level")
 	flag.Int64Var(&flagStoreInterval, "i", 300, "store interval")
 	flag.StringVar(&flagFileStoragePath, "f", "./backups", "file storage path")
