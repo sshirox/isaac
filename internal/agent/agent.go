@@ -422,7 +422,7 @@ func (mt *Monitor) sendGRPCMetrics(address string) error {
 		Delta: &mt.pollCount,
 	})
 
-	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		slog.Error("Failed to connect to gRPC server", slog.String("address", address), slog.Any("error", err))
 		return err
