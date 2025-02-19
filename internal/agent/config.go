@@ -7,6 +7,7 @@ import (
 
 type Config struct {
 	Address        string `json:"address"`
+	GRPCAddress    string `json:"grpc_address"`
 	HashKey        string `json:"hash_key"`
 	CryptoKeyPath  string `json:"crypto_key"`
 	ReportInterval int64  `json:"report_interval"`
@@ -51,6 +52,10 @@ func loadConfigs(path string) error {
 
 	if cfg.RateLimit != 0 && flagRateLimit == 0 {
 		flagRateLimit = cfg.RateLimit
+	}
+
+	if cfg.GRPCAddress != "" {
+		flagGRPCAddr = cfg.GRPCAddress
 	}
 
 	return nil

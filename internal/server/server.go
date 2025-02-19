@@ -4,8 +4,13 @@ import (
 	"context"
 	"crypto/rsa"
 	"github.com/pkg/errors"
+	grpcHandle "github.com/sshirox/isaac/internal/grpc"
+	pb "github.com/sshirox/isaac/internal/proto/metrics/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 	"log"
 	"log/slog"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -68,6 +73,14 @@ func Run() error {
 	r.Use(chimiddleware.Recoverer)
 	r.Use(logger.WithLogging)
 	r.Use(middleware.GZipMiddleware)
+
+	trustedSubnetMiddleware, err := middleware.TrustedSubnetMiddleware(flagTrustedSubnet)
+	if err != nil {
+		slog.Error("Failed to initialize middleware", slog.Any("error", err))
+	} else {
+		r.Use(trustedSubnetMiddleware)
+	}
+
 	s := storage.NewMemStorage()
 
 	go func() {
@@ -120,6 +133,10 @@ func Run() error {
 	}
 
 	slog.Info("Running server", "address", flagRunAddr)
+
+	if flagGRPCAddr != "" {
+		RunGRPCServer(s, flagGRPCAddr)
+	}
 
 	err = http.ListenAndServe(flagRunAddr, r)
 
@@ -190,6 +207,10 @@ func initConf() error {
 		storageSource = memoryStorageSource
 	}
 
+	if envTrustedSubnet := os.Getenv("TRUSTED_SUBNET"); envTrustedSubnet != "" {
+		flagTrustedSubnet = envTrustedSubnet
+	}
+
 	if envConfigPath := os.Getenv("CONFIG"); envConfigPath != "" {
 		flagConfigPath = envConfigPath
 	}
@@ -206,4 +227,24 @@ func initConf() error {
 	}
 
 	return nil
+}
+
+// RunGRPCServer initializes and starts a gRPC server.
+func RunGRPCServer(metricsStorage *storage.MemStorage, address string) {
+	lis, err := net.Listen("tcp", address)
+	if err != nil {
+		slog.Error("Failed to start listener", slog.String("address", address), slog.Any("error", err))
+	}
+
+	grpcServer := grpc.NewServer()
+	pb.RegisterMetricsServiceServer(grpcServer, grpcHandle.NewServer(metricsStorage))
+	reflection.Register(grpcServer)
+
+	slog.Info("Starting gRPC server", slog.String("address", address))
+
+	go func() {
+		if err := grpcServer.Serve(lis); err != nil {
+			slog.Error("gRPC server stopped unexpectedly", slog.Any("error", err))
+		}
+	}()
 }

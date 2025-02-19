@@ -8,6 +8,7 @@ import (
 type Config struct {
 	StoreInterval   int64  `json:"store_interval"`
 	Address         string `json:"address"`
+	GRPCAddress     string `json:"grpc_address"`
 	Level           string `json:"level"`
 	FilePath        string `json:"file_path"`
 	RestoreStr      string `json:"restore_str"`
@@ -16,6 +17,7 @@ type Config struct {
 	HashKey         string `json:"hash_key"`
 	CryptoKeyPath   string `json:"crypto_key"`
 	Restore         string `json:"restore"`
+	TrustedSubnet   string `json:"trusted_subnet"`
 }
 
 func loadConfigs(path string) error {
@@ -55,6 +57,14 @@ func loadConfigs(path string) error {
 
 	if cfg.CryptoKeyPath != "" && flagCryptoKeyPath == "" {
 		flagCryptoKeyPath = cfg.CryptoKeyPath
+	}
+
+	if cfg.TrustedSubnet != "" {
+		flagTrustedSubnet = cfg.TrustedSubnet
+	}
+
+	if cfg.GRPCAddress != "" {
+		flagGRPCAddr = cfg.GRPCAddress
 	}
 
 	return nil

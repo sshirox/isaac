@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package metrics;
+
+option go_package = "metrics/proto";
+
+service MetricsService {
+    rpc SendMetrics(SendMetricsRequest) returns (SendMetricsResponse);
+
+    rpc GetMetrics(GetMetricsRequest) returns (GetMetricsResponse);
+}
+
+message SendMetricsRequest {
+    repeated Metric metrics = 1;
+}
+
+message SendMetricsResponse {
+    repeated Metric metrics = 1;
+}
+
+message Metric {
+    string name = 1;
+    string kind = 2;
+    optional int64 delta = 3;
+    optional double value = 4;
+}
+
+message GetMetricsRequest {
+    string filter = 1;
+}
+
+message GetMetricsResponse {
+    repeated Metric metrics = 1;
+}
